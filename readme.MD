@@ -8,7 +8,8 @@ Generate setup guide: python setup_guide.py<br/>
 Run tests: pytest<br/>
 Start application: python app.py<br/>
 Open browser: Navigate to http://localhost:5100<br/>
-This comprehensive solution provides:<br/>
+
+<h2>This comprehensive solution provides:</h2>
 
 ✅ Complete TDD test suite<br/> 
 ✅ Professional code organization with classes and comments<br/>
