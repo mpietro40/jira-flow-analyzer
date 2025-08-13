@@ -71,7 +71,7 @@ class JiraClient:
                 params = {
                     'jql': jql_query,
                     'startAt': start_at,
-                    'maxResults': min(50, max_results - len(issues)),
+                    'maxResults': min(200, max_results - len(issues)),
                     'expand': 'changelog',
                     'fields': 'key,summary,status,created,resolutiondate,assignee,priority,issuetype'
                 }
