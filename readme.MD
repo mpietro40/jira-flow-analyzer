@@ -1,5 +1,5 @@
 <h1>jira flow analyzer</h1>
-Quick Start Instructions<br/>
+<h2>Quick Start Instructions</h2>
 Save all files in the structure shown above<br/>
 Create virtual environment: python -m venv venv<br/>
 Activate it: source venv/bin/activate (Linux/Mac) or venv\Scripts\activate (Windows)<br/>
