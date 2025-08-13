@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira Analytics Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .chart-container {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <header class="bg-primary text-white p-4 mb-4">
+                    <h1><i class="fas fa-chart-line"></i> Jira Analytics Dashboard</h1>
+                    <p class="mb-0">Analyze your team's agile metrics and lead times</p>
+                </header>
+
+                <!-- Input Form -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3><i class="fas fa-cog"></i> Configuration</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="analysisForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="jira_url" class="form-label">Jira Server URL</label>
+                                        <input type="url" class="form-control" id="jira_url" name="jira_url" 
+                                               placeholder="https://your-company.atlassian.net" required>
+                                        <div class="form-text">Enter your Jira server URL</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="access_token" class="form-label">Access Token</label>
+                                        <input type="password" class="form-control" id="access_token" name="access_token" 
+                                               placeholder="Your API token" required>
+                                        <div class="form-text">API token for authentication</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label for="jql_query" class="form-label">JQL Query</label>
+                                        <input type="text" class="form-control" id="jql_query" name="jql_query" 
+                                               placeholder="project = PROJ AND status changed" required>
+                                        <div class="form-text">JQL query to filter issues</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="time_period" class="form-label">Analysis Period</label>
+                                        <select class="form-select" id="time_period" name="time_period">
+                                            <option value="1">Last 1 Month</option>
+                                            <option value="2">Last 2 Months</option>
+                                            <option value="3" selected>Last 3 Months</option>
+                                            <option value="6">Last 6 Months</option>
+                                            <option value="12">Last Year</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-play"></i> Analyze Data
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loading" class="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Analyzing your Jira data...</p>
+                </div>
+
+                <!-- Results Section -->
+                <div id="results" style="display: none;">
+                    <!-- Metrics Summary -->
+                    <div id="metricsSection" class="row mb-4">
+                        <!-- Metrics will be populated here -->
+                    </div>
+
+                    <!-- Charts Section -->
+                    <div id="chartsSection">
+                        <!-- Charts will be populated here -->
+                    </div>
+
+                    <!-- Download Report Button -->
+                    <div class="text-center mt-4">
+                        <button id="downloadReport" class="btn btn-success btn-lg">
+                            <i class="fas fa-download"></i> Download PDF Report
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Messages -->
+                <div id="messages"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let analysisResults = null;
+
+        document.getElementById('analysisForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('messages').innerHTML = '';
+            
+            fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    analysisResults = data;
+                    displayResults(data);
+                    showMessage('Analysis completed successfully!', 'success');
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showMessage(`Network error: ${error.message}`, 'error');
+            });
+        });
+
+        function displayResults(data) {
+            // Display metrics
+            displayMetrics(data.metrics);
+            
+            // Display charts
+            displayCharts(data.charts);
+            
+            document.getElementById('results').style.display = 'block';
+        }
+
+        function displayMetrics(metrics) {
+            const metricsSection = document.getElementById('metricsSection');
+            metricsSection.innerHTML = '';
+
+            if (metrics.lead_time) {
+                const lt = metrics.lead_time;
+                metricsSection.innerHTML += `
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h4><i class="fas fa-clock"></i> Average Lead Time</h4>
+                            <h2>${lt.average.toFixed(1)} days</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h4><i class="fas fa-chart-bar"></i> Median Lead Time</h4>
+                            <h2>${lt.median.toFixed(1)} days</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h4><i class="fas fa-exclamation-triangle"></i> 85th Percentile</h4>
+                            <h2>${lt.p85.toFixed(1)} days</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h4><i class="fas fa-warning"></i> 95th Percentile</h4>
+                            <h2>${lt.p95.toFixed(1)} days</h2>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function displayCharts(charts) {
+            const chartsSection = document.getElementById('chartsSection');
+            chartsSection.innerHTML = '';
+
+            const chartTitles = {
+                'lead_time_distribution': 'Lead Time Distribution',
+                'cycle_time_comparison': 'Cycle Time Comparison', 
+                'status_duration_boxplot': 'Status Duration Analysis',
+                'lead_time_trend': 'Lead Time Trend',
+                'metrics_summary': 'Metrics Summary'
+            };
+
+            for (const [chartKey, chartTitle] of Object.entries(chartTitles)) {
+                if (charts[chartKey]) {
+                    chartsSection.innerHTML += `
+                        <div class="chart-container">
+                            <h4>${chartTitle}</h4>
+                            <img src="${charts[chartKey]}" class="img-fluid" alt="${chartTitle}">
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function showMessage(message, type) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = `<div class="${type}">${message}</div>`;
+            
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    messagesDiv.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        // Download PDF report
+        document.getElementById('downloadReport').addEventListener('click', function() {
+            if (!analysisResults) {
+                showMessage('No analysis results available', 'error');
+                return;
+            }
+
+            fetch('/generate_report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(analysisResults)
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('PDF generation failed');
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `jira_analysis_${new Date().toISOString().slice(0,10)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                showMessage('PDF report downloaded successfully!', 'success');
+            })
+            .catch(error => {
+                showMessage(`PDF generation error: ${error.message}`, 'error');
+            });
+        });
+    </script>
+</body>
+</html>
