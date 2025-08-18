@@ -25,11 +25,72 @@ class DataAnalyzer:
     def __init__(self):
         """Initialize the data analyzer."""
         self.status_mappings = {
-            'in_progress': ['In Progress', 'In Development', 'Development', 'Doing'],
+            'in_progress': ['In Progress', 'In Development', 'Development', 'Doing','Work In Progress','Active'],
             'testing': ['Testing','To Test', 'In Testing', 'Test', 'QA', 'Quality Assurance'],
             'validation': ['Validation', 'To Validate', 'In Review', 'Review', 'Validation', 'Acceptance'],
-            'done': ['Done', 'Closed', 'Resolved', 'Complete', 'Finished']
+            'done': ['Done', 'Closed', 'Resolved', 'Complete', 'Finished', 'Completed', 'Delivered', 'Released']
         }
+        # Store discovered statuses for debugging
+        self.discovered_statuses = set()
+    
+    def _discover_and_map_statuses(self, df: pd.DataFrame) -> Dict[str, List[str]]:
+       """
+       Discover actual status names in the data and create enhanced mappings.
+    
+       Args:
+           df (pd.DataFrame): DataFrame with issue data
+        
+       Returns:
+           Dict[str, List[str]]: Enhanced status mappings
+       """
+       # Collect all unique status names from the data
+       all_statuses = set()
+    
+       for _, issue in df.iterrows():
+           # Add current status
+           if issue['current_status']:
+               all_statuses.add(issue['current_status'])
+        
+           # Add statuses from transitions
+           for transition in issue['status_transitions']:
+               if transition.get('from_status'):
+                   all_statuses.add(transition['from_status'])
+               if transition.get('to_status'):
+                   all_statuses.add(transition['to_status'])
+    
+       self.discovered_statuses = all_statuses
+       logger.info(f"Discovered statuses in data: {sorted(all_statuses)}")
+    
+       # Create enhanced mappings with auto-detection
+       enhanced_mappings = dict(self.status_mappings)
+    
+       # Auto-detect common patterns
+       for status in all_statuses:
+           status_lower = status.lower()
+           already_mapped = any(status in mapping for mapping in enhanced_mappings.values())
+        
+           if not already_mapped:
+               # In Progress patterns
+               if any(pattern in status_lower for pattern in ['progress', 'doing', 'active', 'development', 'dev', 'wip']):
+                   enhanced_mappings['in_progress'].append(status)
+                   logger.info(f"Auto-mapped '{status}' to 'in_progress'")
+            
+               # Testing patterns
+               elif any(pattern in status_lower for pattern in ['test', 'qa', 'quality']):
+                   enhanced_mappings['testing'].append(status)
+                   logger.info(f"Auto-mapped '{status}' to 'testing'")
+            
+               # Validation patterns
+               elif any(pattern in status_lower for pattern in ['review', 'validation', 'approve', 'accept', 'uat']):
+                   enhanced_mappings['validation'].append(status)
+                   logger.info(f"Auto-mapped '{status}' to 'validation'")
+            
+               # Done patterns
+               elif any(pattern in status_lower for pattern in ['done', 'close', 'resolve', 'complete', 'finish', 'deliver']):
+                   enhanced_mappings['done'].append(status)
+                   logger.info(f"Auto-mapped '{status}' to 'done'")
+    
+       return enhanced_mappings
     
     def analyze_issues(self, issues: List[Dict], months_back: int = 3) -> Dict:
         """
@@ -46,6 +107,10 @@ class DataAnalyzer:
         
         # Convert to DataFrame for easier analysis
         df = self._create_dataframe(issues)
+        
+        # Discover and map statuses from actual data
+        if not df.empty:
+            self.status_mappings = self._discover_and_map_statuses(df)
         
         if df.empty:
             return self._empty_analysis_result()
@@ -70,6 +135,42 @@ class DataAnalyzer:
         # Calculate summary metrics
         metrics = self._calculate_summary_metrics(lead_times, cycle_times, status_durations)
         
+        # Log discovered statuses for debugging
+        logger.info(f"Final status mappings: {self.status_mappings}")
+        for status_type, durations in status_durations.items():
+            logger.info(f"{status_type}: {len(durations)} measurements")
+        
+        # Enhanced logging for debugging
+        logger.info("=== ANALYSIS RESULTS ===")
+        logger.info(f"Total issues analyzed: {len(df_filtered)}")
+        logger.info(f"Lead times calculated: {len(lead_times)}")
+
+        logger.info("Cycle time measurements by status:")
+        for status_type, durations in status_durations.items():
+            count = len(durations)
+            avg_duration = np.mean(durations) if durations else 0
+            logger.info(f"  {status_type}: {count} measurements, avg {avg_duration:.1f} days")
+
+        # Check for Done transitions
+        done_transitions = 0
+        for _, issue in df_filtered.iterrows():
+            for transition in issue['status_transitions']:
+                if self._is_status_type(transition.get('to_status', ''), 'done'):
+                    done_transitions += 1
+
+        logger.info(f"Issues with transitions to Done status: {done_transitions}")
+
+        # Log unmapped statuses
+        mapped_statuses = set()
+        for status_list in self.status_mappings.values():
+            mapped_statuses.update(status_list)
+
+        unmapped = self.discovered_statuses - mapped_statuses
+        if unmapped:
+            logger.warning(f"Unmapped statuses found: {sorted(list(unmapped))}")
+        else:
+            logger.info("All discovered statuses were successfully mapped")
+        
         return {
             'metrics': metrics,
             'distributions': distributions,
@@ -79,6 +180,7 @@ class DataAnalyzer:
             'analysis_period': f"{months_back} months",
             'total_issues': len(df_filtered)
         }
+    
     
     def _get_timezone_aware_cutoff_date(self, df: pd.DataFrame, months_back: int) -> pd.Timestamp:
         """

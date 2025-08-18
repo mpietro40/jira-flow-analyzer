@@ -126,6 +126,47 @@ class PDFReportGenerator:
         # Summary stats
         total_issues = data.get('total_issues', 0)
         content.append(Paragraph(f"Total Issues Analyzed: {total_issues}", self.styles['Normal']))
+        content.append(Spacer(1, 0.2*inch))
+        
+        # Add original JQL query submitted
+        # content.append(Paragraph(f"JQL Query Submitted:")
+        
+        # Jira server info
+        jira_url = data.get('jira_url', 'Unknown server')
+        content.append(Paragraph(f"Jira Server: {jira_url}", self.styles['Normal']))
+        content.append(Spacer(1, 0.15*inch))
+    
+        # JQL Query
+        jql_query = data.get('jql_query', 'No query specified')
+        # Wrap long queries to prevent page overflow
+        if len(jql_query) > 80:
+            # Split long queries into multiple lines for better readability
+            query_parts = []
+            words = jql_query.split(' ')
+            current_line = ""
+            for word in words:
+                if len(current_line + word) > 80:
+                    if current_line:
+                        query_parts.append(current_line.strip())
+                    current_line = word + " "
+                else:
+                    current_line += word + " "
+            if current_line:
+                query_parts.append(current_line.strip())
+        
+            content.append(Paragraph("JQL Query Submitted:", self.styles['Normal']))
+            for part in query_parts:
+                content.append(Paragraph(f"<font name='Courier'>{part}</font>", self.styles['Normal']))
+        else:
+            content.append(Paragraph(f"JQL Query Submitted: <font name='Courier'>{jql_query}</font>", self.styles['Normal']))
+    
+        content.append(Spacer(1, 0.2*inch))
+        #Adding few horizontal line for separation
+        ##
+        content.append(Spacer(1, 340))  # 340 points = 20 lines of height
+        ##
+         
+        content.append(Paragraph("Prepared by: Lead Time Analysis Tool - 2025 - Thanks to Pietro", self.styles['Normal']))
         
         return content
     
@@ -143,7 +184,7 @@ class PDFReportGenerator:
             lt = metrics['lead_time']
             summary_text = f"""
             This report analyzes {data.get('total_issues', 0)} Jira issues over the past {data.get('analysis_period', 'unknown period')}.
-            
+            <br/>
             <b>Key Findings:</b><br/>
             • Average Lead Time: {lt.get('average', 0):.1f} days<br/>
             • Median Lead Time: {lt.get('median', 0):.1f} days<br/>

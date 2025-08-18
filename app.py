@@ -73,6 +73,8 @@ def analyze():
             'total_issues': len(issues),
             'analysis_period': f"{time_period} months",
             'charts': charts,
+            'jql_query': jql_query,  # Add this line
+            'jira_url': jira_url,    # Add this line  
             'metrics': analysis_results['metrics']
         })
         

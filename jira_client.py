@@ -49,8 +49,13 @@ class JiraClient:
         except Exception as e:
             logger.error(f"❌ Connection test failed: {str(e)}")
             return False
-    
-    def fetch_issues(self, jql_query: str, max_results: int = 1000) -> List[Dict]:
+        
+    ## Fetch issues based on JQL query
+    ## This method retrieves issues from Jira using a JQL query.
+    ## It handles pagination and processes each issue to extract relevant data.
+    ## max rows is set to 2000 by default, but can be adjusted.
+    ## fetching is done in chunks of 200 to avoid hitting API limits.
+    def fetch_issues(self, jql_query: str, max_results: int = 2000) -> List[Dict]:
         """
         Fetch issues from Jira using JQL query.
         
