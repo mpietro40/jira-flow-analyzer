@@ -15,7 +15,9 @@ import base64
 from typing import Dict, List, Tuple
 import logging
 
-logger = logging.getLogger(__name__)
+# Configure logger with proper name
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('JiraVisualization')
 
 # Set style for better-looking plots
 plt.style.use('default')
@@ -81,7 +83,7 @@ class VisualizationGenerator:
                 )
             
         except Exception as e:
-            logger.error(f"Chart generation error: {str(e)}")
+            logger.error(f"🚩 Chart generation error: {str(e)}")
             charts['error'] = str(e)
         
         return charts

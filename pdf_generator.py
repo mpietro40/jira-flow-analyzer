@@ -14,7 +14,9 @@ import base64
 import logging
 from typing import Dict
 
-logger = logging.getLogger(__name__)
+# Configure logger with proper name
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('JiraPDFGenerator')
 
 class PDFReportGenerator:
     """
@@ -99,10 +101,10 @@ class PDFReportGenerator:
             
             # Build PDF
             doc.build(story)
-            logger.info(f"PDF report generated successfully: {output_path}")
+            logger.info(f"✅ PDF report generated successfully: {output_path}")
             
         except Exception as e:
-            logger.error(f"PDF generation failed: {str(e)}")
+            logger.error(f"🚩 PDF generation failed: {str(e)}")
             raise Exception(f"Failed to generate PDF report: {str(e)}")
     
     def _create_title_page(self, data: Dict) -> list:

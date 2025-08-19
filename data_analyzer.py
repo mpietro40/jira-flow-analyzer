@@ -12,7 +12,9 @@ from dateutil import parser
 from scipy import stats
 import pytz
 
-logger = logging.getLogger(__name__)
+# Configure logger with proper name
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('JiraAnalyzer')
 
 class DataAnalyzer:
     """
@@ -25,72 +27,98 @@ class DataAnalyzer:
     def __init__(self):
         """Initialize the data analyzer."""
         self.status_mappings = {
-            'in_progress': ['In Progress', 'In Development', 'Development', 'Doing','Work In Progress','Active'],
+            'in_progress': ['In Progress', 'In Development', 'Development', 'Doing','Work In Progress','Active','In analysis','Analysis in progress','Implementation in progress'],
             'testing': ['Testing','To Test', 'In Testing', 'Test', 'QA', 'Quality Assurance'],
             'validation': ['Validation', 'To Validate', 'In Review', 'Review', 'Validation', 'Acceptance'],
-            'done': ['Done', 'Closed', 'Resolved', 'Complete', 'Finished', 'Completed', 'Delivered', 'Released']
+            'done': ['Done', 'Closed', 'Resolved', 'Complete', 'Finished', 'Completed', 'Delivered', 'Released', 'Close'],
+            'waiting': ['Waiting', 'New', 'Open', 'Accepted', 'Information needed', 'On Hold', 'Blocked', 'Pending','Deployment requested','Estimation', 'To Deploy', 'Waiting for Deployment', 'Waiting for Release', 'Waiting for Approval', 'Waiting for Feedback', 'Waiting for Review', 'Waiting for Test', 'Waiting for Validation']
         }
         # Store discovered statuses for debugging
         self.discovered_statuses = set()
     
     def _discover_and_map_statuses(self, df: pd.DataFrame) -> Dict[str, List[str]]:
-       """
-       Discover actual status names in the data and create enhanced mappings.
-    
-       Args:
-           df (pd.DataFrame): DataFrame with issue data
+        """
+        Discover actual status names in the data and create enhanced mappings.
+        Uses fuzzy matching against existing status_mappings.
         
-       Returns:
-           Dict[str, List[str]]: Enhanced status mappings
-       """
-       # Collect all unique status names from the data
-       all_statuses = set()
-    
-       for _, issue in df.iterrows():
-           # Add current status
-           if issue['current_status']:
-               all_statuses.add(issue['current_status'])
+        Args:
+            df (pd.DataFrame): DataFrame with issue data
+            
+        Returns:
+            Dict[str, List[str]]: Enhanced status mappings
+        """
+        # Collect all unique status names from the data
+        all_statuses = set()
         
-           # Add statuses from transitions
-           for transition in issue['status_transitions']:
-               if transition.get('from_status'):
-                   all_statuses.add(transition['from_status'])
-               if transition.get('to_status'):
-                   all_statuses.add(transition['to_status'])
-    
-       self.discovered_statuses = all_statuses
-       logger.info(f"Discovered statuses in data: {sorted(all_statuses)}")
-    
-       # Create enhanced mappings with auto-detection
-       enhanced_mappings = dict(self.status_mappings)
-    
-       # Auto-detect common patterns
-       for status in all_statuses:
-           status_lower = status.lower()
-           already_mapped = any(status in mapping for mapping in enhanced_mappings.values())
+        for _, issue in df.iterrows():
+            if issue['current_status']:
+                all_statuses.add(issue['current_status'])
+            
+            for transition in issue['status_transitions']:
+                if transition.get('from_status'):
+                    all_statuses.add(transition['from_status'])
+                if transition.get('to_status'):
+                    all_statuses.add(transition['to_status'])
         
-           if not already_mapped:
-               # In Progress patterns
-               if any(pattern in status_lower for pattern in ['progress', 'doing', 'active', 'development', 'dev', 'wip']):
-                   enhanced_mappings['in_progress'].append(status)
-                   logger.info(f"Auto-mapped '{status}' to 'in_progress'")
+        self.discovered_statuses = all_statuses
+        logger.info(f"🔍 Discovered statuses in data: {sorted(all_statuses)}")
+        
+        # Create enhanced mappings with fuzzy matching
+        enhanced_mappings = {k: list(v) for k, v in self.status_mappings.items()}
+        
+        # Auto-map unmapped statuses using fuzzy matching against existing mappings
+        for status in all_statuses:
+            already_mapped = any(status in mapping for mapping in enhanced_mappings.values())
             
-               # Testing patterns
-               elif any(pattern in status_lower for pattern in ['test', 'qa', 'quality']):
-                   enhanced_mappings['testing'].append(status)
-                   logger.info(f"Auto-mapped '{status}' to 'testing'")
-            
-               # Validation patterns
-               elif any(pattern in status_lower for pattern in ['review', 'validation', 'approve', 'accept', 'uat']):
-                   enhanced_mappings['validation'].append(status)
-                   logger.info(f"Auto-mapped '{status}' to 'validation'")
-            
-               # Done patterns
-               elif any(pattern in status_lower for pattern in ['done', 'close', 'resolve', 'complete', 'finish', 'deliver']):
-                   enhanced_mappings['done'].append(status)
-                   logger.info(f"Auto-mapped '{status}' to 'done'")
+            if not already_mapped:
+                best_match = self._find_best_status_match(status, enhanced_mappings)
+                if best_match:
+                    enhanced_mappings[best_match].append(status)
+                    logger.info(f"🔗 Auto-mapped '{status}' to '{best_match}'")
+        
+        return enhanced_mappings
     
-       return enhanced_mappings
+    def _find_best_status_match(self, status: str, mappings: Dict[str, List[str]]) -> str:
+        """
+        Find the best matching status category using fuzzy matching.
+        
+        Args:
+            status (str): Status to match
+            mappings (Dict[str, List[str]]): Current status mappings
+            
+        Returns:
+            str: Best matching category or None
+        """
+        status_lower = status.lower()
+        best_score = 0
+        best_category = None
+        
+        for category, known_statuses in mappings.items():
+            for known_status in known_statuses:
+                known_lower = known_status.lower()
+                
+                # Exact match
+                if status_lower == known_lower:
+                    return category
+                
+                # Substring match
+                if status_lower in known_lower or known_lower in status_lower:
+                    score = min(len(status_lower), len(known_lower)) / max(len(status_lower), len(known_lower))
+                    if score > best_score:
+                        best_score = score
+                        best_category = category
+                
+                # Word overlap
+                status_words = set(status_lower.split())
+                known_words = set(known_lower.split())
+                overlap = len(status_words & known_words)
+                if overlap > 0:
+                    score = overlap / max(len(status_words), len(known_words))
+                    if score > best_score:
+                        best_score = score
+                        best_category = category
+        
+        return best_category if best_score > 0.3 else None
     
     def analyze_issues(self, issues: List[Dict], months_back: int = 3) -> Dict:
         """
@@ -119,7 +147,7 @@ class DataAnalyzer:
         cutoff_date = self._get_timezone_aware_cutoff_date(df, months_back)
         df_filtered = df[df['created'] >= cutoff_date].copy()
         
-        logger.info(f"📊 Filtered to {len(df_filtered)} issues within date range")
+        logger.info(f"📅 Filtered to {len(df_filtered)} issues within date range")
         
         if df_filtered.empty:
             return self._empty_analysis_result()
@@ -136,20 +164,20 @@ class DataAnalyzer:
         metrics = self._calculate_summary_metrics(lead_times, cycle_times, status_durations)
         
         # Log discovered statuses for debugging
-        logger.info(f"Final status mappings: {self.status_mappings}")
+        logger.info(f"🗺️ Final status mappings: {self.status_mappings}")
         for status_type, durations in status_durations.items():
-            logger.info(f"{status_type}: {len(durations)} measurements")
+            logger.info(f"📏 {status_type}: {len(durations)} measurements")
         
         # Enhanced logging for debugging
-        logger.info("=== ANALYSIS RESULTS ===")
-        logger.info(f"Total issues analyzed: {len(df_filtered)}")
-        logger.info(f"Lead times calculated: {len(lead_times)}")
+        logger.info("📈 === ANALYSIS RESULTS ===")
+        logger.info(f"📊 Total issues analyzed: {len(df_filtered)}")
+        logger.info(f"⏱️ Lead times calculated: {len(lead_times)}")
 
-        logger.info("Cycle time measurements by status:")
+        logger.info("⏳ Cycle time measurements by status:")
         for status_type, durations in status_durations.items():
             count = len(durations)
             avg_duration = np.mean(durations) if durations else 0
-            logger.info(f"  {status_type}: {count} measurements, avg {avg_duration:.1f} days")
+            logger.info(f"  📊 {status_type}: {count} measurements, avg {avg_duration:.1f} days")
 
         # Check for Done transitions
         done_transitions = 0
@@ -158,7 +186,7 @@ class DataAnalyzer:
                 if self._is_status_type(transition.get('to_status', ''), 'done'):
                     done_transitions += 1
 
-        logger.info(f"Issues with transitions to Done status: {done_transitions}")
+        logger.info(f"✅ Issues with transitions to Done status: {done_transitions}")
 
         # Log unmapped statuses
         mapped_statuses = set()
@@ -167,9 +195,9 @@ class DataAnalyzer:
 
         unmapped = self.discovered_statuses - mapped_statuses
         if unmapped:
-            logger.warning(f"Unmapped statuses found: {sorted(list(unmapped))}")
+            logger.warning(f"⚠️ Unmapped statuses found: {sorted(list(unmapped))}")
         else:
-            logger.info("All discovered statuses were successfully mapped")
+            logger.info(f"✅ All discovered statuses were successfully mapped")
         
         return {
             'metrics': metrics,
@@ -348,6 +376,7 @@ class DataAnalyzer:
             'in_progress': [],
             'testing': [],
             'validation': [],
+            'waiting': [],
             'total': []
         }
         
@@ -383,6 +412,7 @@ class DataAnalyzer:
         durations = {
             'in_progress': 0.0,
             'testing': 0.0,
+            'waiting': 0.0,
             'validation': 0.0
         }
         
@@ -465,6 +495,7 @@ class DataAnalyzer:
         all_durations = {
             'in_progress': [],
             'testing': [],
+            'waiting': [],
             'validation': []
         }
         
