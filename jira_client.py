@@ -10,7 +10,7 @@ from typing import List, Dict, Optional
 import json
 
 # Configure logger with proper name
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
 logger = logging.getLogger('JiraClient')
 
 class JiraClient:
@@ -57,7 +57,7 @@ class JiraClient:
     ## It handles pagination and processes each issue to extract relevant data.
     ## max rows is set to 5000 by default, but can be adjusted.
     ## fetching is done in chunks of 200 to avoid hitting API limits.
-    def fetch_issues(self, jql_query: str, max_results: int = 5000) -> List[Dict]:
+    def fetch_issues(self, jql_query: str, max_results: int = 5000, start_at: int = 0) -> List[Dict]:
         """
         Fetch issues from Jira using JQL query.
         
@@ -69,7 +69,7 @@ class JiraClient:
             List[Dict]: List of issue dictionaries with relevant data
         """
         issues = []
-        start_at = 0
+        current_start = start_at
         logger.info(f"🔍 Fetching issues with JQL: {jql_query}")
         
         while True:
@@ -77,7 +77,7 @@ class JiraClient:
                 # Prepare request parameters
                 params = {
                     'jql': jql_query,
-                    'startAt': start_at,
+                    'startAt': current_start,
                     'maxResults': min(200, max_results - len(issues)),
                     'expand': 'changelog',
                     'fields': 'key,summary,status,created,resolutiondate,assignee,priority,issuetype'
@@ -101,10 +101,10 @@ class JiraClient:
                     if processed_issue:
                         issues.append(processed_issue)
                 
-                start_at += len(batch_issues)
+                current_start += len(batch_issues)
                 
                 # Check if we've fetched all available issues
-                if start_at >= data.get('total', 0) or len(issues) >= max_results:
+                if current_start >= data.get('total', 0) or len(issues) >= max_results:
                     break
                     
             except requests.exceptions.RequestException as e:
@@ -223,12 +223,12 @@ class JiraClient:
             List[Dict]: List of issue dictionaries with relevant data
         """
         all_issues = []
-    
         logger.info(f"🔍 Attempting to fetch {len(issue_keys)} issue keys")
     
         # Process in batches to avoid URL length limits
         batch_size = 50  # Conservative batch size for key-based queries
     
+        batch_num = 1
         for i in range(0, len(issue_keys), batch_size):
             batch_keys = issue_keys[i:i + batch_size]
         
@@ -237,54 +237,25 @@ class JiraClient:
                 keys_str = ','.join(batch_keys)
                 jql = f"key in ({keys_str})"
             
-                logger.info(f"📦 Fetching batch {i//batch_size + 1}: {len(batch_keys)} keys")
+                logger.info(f"📦 Fetching batch {batch_num}: {len(batch_keys)} keys")
                 logger.info(f"🔍 JQL query: {jql}")
             
-                # Test the JQL query first with a simple search
-                test_response = self.session.get(
-                    f'{self.base_url}/rest/api/2/search',
-                    params={
-                        'jql': jql,
-                        'startAt': 0,
-                        'maxResults': 1,
-                        'fields': 'key'
-                    }
-                )
-                test_response.raise_for_status()
-                test_data = test_response.json()
-            
-                logger.info(f"📊 JQL test result: found {test_data.get('total', 0)} issues")
-                if test_data.get('total', 0) == 0:
-                    logger.warning(f"⚠️ No issues found for batch: {batch_keys}")
-                
-                    # Try individual key lookups for debugging
-                    for key in batch_keys[:3]:  # Test first 3 keys
-                        individual_jql = f"key = {key}"
-                        logger.info(f"🔍 Testing individual key: {individual_jql}")
-                        individual_response = self.session.get(
-                            f'{self.base_url}/rest/api/2/search',
-                            params={'jql': individual_jql, 'maxResults': 1, 'fields': 'key'}
-                        )
-                        if individual_response.status_code == 200:
-                            individual_data = individual_response.json()
-                            logger.info(f"📊 Individual key {key} result: {individual_data.get('total', 0)} issues")
-                        else:
-                            logger.warning(f"⚠️ Individual key {key} failed: {individual_response.status_code}")
-                    continue
-            
-                # Fetch this batch using the existing fetch_issues method with correct signature
-                batch_issues = self.fetch_issues(jql, max_results=len(batch_keys))
-                logger.info(f"✅ Fetched {len(batch_issues)} issues from batch")
+                # Fetch this batch directly
+                batch_issues = self._fetch_batch_directly(jql, len(batch_keys))
+                logger.info(f"✅ Fetched {len(batch_issues)} issues from batch {batch_num}")
                 all_issues.extend(batch_issues)
             
                 # If including subtasks, fetch related issues
                 if include_subtasks:
                     related_issues = self._fetch_related_issues(batch_keys)
-                    logger.info(f"🔗 Fetched {len(related_issues)} related issues")
+                    logger.info(f"🔗 Fetched {len(related_issues)} related issues for batch {batch_num}")
                     all_issues.extend(related_issues)
                 
+                batch_num += 1
+                
             except Exception as e:
-                logger.error(f"🚩 Failed to fetch batch starting at {i}: {str(e)}")
+                logger.error(f"🚩 Failed to fetch batch {batch_num}: {str(e)}")
+                batch_num += 1
                 continue
     
         # Remove duplicates based on key
@@ -321,7 +292,7 @@ class JiraClient:
             keys_str = ','.join(parent_keys)
             subtask_jql = f"parent in ({keys_str})"
         
-            subtasks = self.fetch_issues(subtask_jql, months_back=24, max_results=1000)
+            subtasks = self._fetch_batch_directly(subtask_jql, 1000)
             related_issues.extend(subtasks)
         
             logger.info(f"🔗 Found {len(subtasks)} subtasks for parent issues")
@@ -333,3 +304,55 @@ class JiraClient:
             logger.warning(f"⚠️ Failed to fetch related issues: {str(e)}")
     
         return related_issues
+    
+    def _fetch_batch_directly(self, jql_query: str, max_results: int) -> List[Dict]:
+        """
+        Fetch issues directly without duplicate logging.
+        
+        Args:
+            jql_query (str): JQL query string
+            max_results (int): Maximum number of results to fetch
+            
+        Returns:
+            List[Dict]: List of issue dictionaries
+        """
+        issues = []
+        current_start = 0
+        
+        while True:
+            try:
+                params = {
+                    'jql': jql_query,
+                    'startAt': current_start,
+                    'maxResults': min(200, max_results - len(issues)),
+                    'expand': 'changelog',
+                    'fields': 'key,summary,status,created,resolutiondate,assignee,priority,issuetype'
+                }
+                
+                response = self.session.get(
+                    f'{self.base_url}/rest/api/2/search',
+                    params=params
+                )
+                response.raise_for_status()
+                
+                data = response.json()
+                batch_issues = data.get('issues', [])
+                
+                if not batch_issues:
+                    break
+                
+                for issue in batch_issues:
+                    processed_issue = self._process_issue(issue)
+                    if processed_issue:
+                        issues.append(processed_issue)
+                
+                current_start += len(batch_issues)
+                
+                if current_start >= data.get('total', 0) or len(issues) >= max_results:
+                    break
+                    
+            except requests.exceptions.RequestException as e:
+                logger.error(f"🚩 API request failed: {str(e)}")
+                break
+        
+        return issues

@@ -8,6 +8,9 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Tabl
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
+from reportlab.platypus.doctemplate import PageTemplate, BaseDocTemplate
+from reportlab.platypus.frames import Frame
+from reportlab.platypus.tableofcontents import TableOfContents
 from datetime import datetime
 import io
 import base64
@@ -17,6 +20,30 @@ from typing import Dict
 # Configure logger with proper name
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger('JiraPDFGenerator')
+
+class NumberedCanvas:
+    """Custom canvas for adding page numbers and footer."""
+    def __init__(self, canvas, doc):
+        self.canvas = canvas
+        self.doc = doc
+    
+    def draw_page_number_and_footer(self):
+        """Draw page number and footer on each page."""
+        page_num = self.canvas.getPageNumber()
+        
+        # Page number (bottom right)
+        page_text = f"Page {page_num}"
+        page_width = A4[0]
+        page_text_width = self.canvas.stringWidth(page_text)
+        self.canvas.drawString(page_width - 72 - page_text_width, 30, page_text)
+        
+        # Footer (bottom center) - smaller font
+        self.canvas.setFont("Helvetica", 8)  # Reduced font size by 2px
+        footer_text = "Prepared by: Lead Time Analysis Tool - 2025 - Copyright Pietro"
+        text_width = self.canvas.stringWidth(footer_text)
+        x_position = (page_width - text_width) / 2
+        self.canvas.drawString(x_position, 30, footer_text)
+        self.canvas.setFont("Helvetica", 12)  # Reset to default font size
 
 class PDFReportGenerator:
     """
@@ -67,14 +94,17 @@ class PDFReportGenerator:
             output_path (str): Path to save the PDF report
         """
         try:
-            # Create PDF document
+            # Create PDF document with custom canvas for page numbers and footer
             doc = SimpleDocTemplate(
                 output_path,
                 pagesize=A4,
                 rightMargin=72,
                 leftMargin=72,
                 topMargin=72,
-                bottomMargin=18
+                bottomMargin=60,  # Increased for footer space
+                author="Lead Time Analysis Tool by Pietro Maffi",
+                title="Jira Analytics Report",
+                subject="Lead Time and Cycle Time Analysis"
             )
             
             # Build report content
@@ -99,8 +129,12 @@ class PDFReportGenerator:
             # Recommendations
             story.extend(self._create_recommendations(analysis_data))
             
-            # Build PDF
-            doc.build(story)
+            # Build PDF with custom canvas function
+            def add_page_elements(canvas, doc):
+                numbered_canvas = NumberedCanvas(canvas, doc)
+                numbered_canvas.draw_page_number_and_footer()
+            
+            doc.build(story, onFirstPage=add_page_elements, onLaterPages=add_page_elements)
             logger.info(f"✅ PDF report generated successfully: {output_path}")
             
         except Exception as e:
@@ -111,8 +145,22 @@ class PDFReportGenerator:
         """Create title page content."""
         content = []
         
+        # Add logo if available
+        try:
+            import os
+            logo_path = os.path.join(os.path.dirname(__file__), 'static', 'logo.png')
+            if os.path.exists(logo_path):
+                logo = Image(logo_path)
+                logo.drawHeight = 1.5*inch
+                logo.drawWidth = 2.5*inch  # Wider to preserve aspect ratio
+                logo.hAlign = 'CENTER'
+                content.append(logo)
+                content.append(Spacer(1, 0.3*inch))
+        except Exception as e:
+            logger.warning(f"⚠️ Could not load logo: {str(e)}")
+        
         # Title
-        content.append(Paragraph("Jira Analytics Report", self.title_style))
+        content.append(Paragraph("Jira Lead time Analytics Report", self.title_style))
         content.append(Spacer(1, 0.5*inch))
         
         # Subtitle
@@ -138,37 +186,38 @@ class PDFReportGenerator:
         content.append(Paragraph(f"Jira Server: {jira_url}", self.styles['Normal']))
         content.append(Spacer(1, 0.15*inch))
     
-        # JQL Query
-        jql_query = data.get('jql_query', 'No query specified')
-        # Wrap long queries to prevent page overflow
-        if len(jql_query) > 80:
-            # Split long queries into multiple lines for better readability
-            query_parts = []
-            words = jql_query.split(' ')
-            current_line = ""
-            for word in words:
-                if len(current_line + word) > 80:
-                    if current_line:
-                        query_parts.append(current_line.strip())
-                    current_line = word + " "
-                else:
-                    current_line += word + " "
-            if current_line:
-                query_parts.append(current_line.strip())
-        
-            content.append(Paragraph("JQL Query Submitted:", self.styles['Normal']))
-            for part in query_parts:
-                content.append(Paragraph(f"<font name='Courier'>{part}</font>", self.styles['Normal']))
+        # Check if this is CSV upload or standard JQL analysis
+        csv_issues_found = data.get('csv_issues_found')
+        if csv_issues_found is not None:
+            # This is CSV upload - show CSV filename instead of JQL
+            content.append(Paragraph("Data Source: CSV File Upload", self.styles['Normal']))
+            content.append(Paragraph(f"Issues found in CSV: {csv_issues_found}", self.styles['Normal']))
         else:
-            content.append(Paragraph(f"JQL Query Submitted: <font name='Courier'>{jql_query}</font>", self.styles['Normal']))
+            # This is standard JQL analysis - show JQL query
+            jql_query = data.get('jql_query', 'No query specified')
+            # Wrap long queries to prevent page overflow
+            if len(jql_query) > 80:
+                # Split long queries into multiple lines for better readability
+                query_parts = []
+                words = jql_query.split(' ')
+                current_line = ""
+                for word in words:
+                    if len(current_line + word) > 80:
+                        if current_line:
+                            query_parts.append(current_line.strip())
+                        current_line = word + " "
+                    else:
+                        current_line += word + " "
+                if current_line:
+                    query_parts.append(current_line.strip())
+            
+                content.append(Paragraph("JQL Query Submitted:", self.styles['Normal']))
+                for part in query_parts:
+                    content.append(Paragraph(f"<font name='Courier'>{part}</font>", self.styles['Normal']))
+            else:
+                content.append(Paragraph(f"JQL Query Submitted: <font name='Courier'>{jql_query}</font>", self.styles['Normal']))
     
         content.append(Spacer(1, 0.2*inch))
-        #Adding few horizontal line for separation
-        ##
-        content.append(Spacer(1, 340))  # 340 points = 20 lines of height
-        ##
-         
-        content.append(Paragraph("Prepared by: Lead Time Analysis Tool - 2025 - Thanks to Pietro", self.styles['Normal']))
         
         return content
     
@@ -237,7 +286,12 @@ class PDFReportGenerator:
                 ['95th Percentile', f"{lt.get('p95', 0):.1f}"]
             ]
             
-            lead_time_table = Table(lead_time_data, colWidths=[2*inch, 1.5*inch])
+            # Use 75% of page width for lead time table
+            page_width = A4[0] - 144  # Subtract margins (72 each side)
+            table_width = page_width * 0.75
+            col1_width = table_width * 0.6
+            col2_width = table_width * 0.4
+            lead_time_table = Table(lead_time_data, colWidths=[col1_width, col2_width])
             lead_time_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -262,7 +316,12 @@ class PDFReportGenerator:
                 cycle_data.append([status, f"{value.get('average', 0):.1f}"])
         
         if len(cycle_data) > 1:
-            cycle_table = Table(cycle_data, colWidths=[2*inch, 1.5*inch])
+            # Use 75% of page width for cycle time table
+            page_width = A4[0] - 144  # Subtract margins (72 each side)
+            table_width = page_width * 0.75
+            col1_width = table_width * 0.6
+            col2_width = table_width * 0.4
+            cycle_table = Table(cycle_data, colWidths=[col1_width, col2_width])
             cycle_table.setStyle(TableStyle([
                 ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -310,6 +369,10 @@ class PDFReportGenerator:
                     img.drawWidth = 6*inch
                     content.append(img)
                     content.append(Spacer(1, 0.3*inch))
+                    
+                    # Add page break after Lead Time Distribution
+                    if chart_key == 'lead_time_distribution':
+                        content.append(PageBreak())
         
         return content
     
@@ -317,6 +380,8 @@ class PDFReportGenerator:
         """Create recommendations section."""
         content = []
         
+        # Add page break before recommendations
+        content.append(PageBreak())
         content.append(Paragraph("Recommendations", self.title_style))
         content.append(Spacer(1, 0.2*inch))
         

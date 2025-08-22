@@ -27,11 +27,16 @@ class DataAnalyzer:
     def __init__(self):
         """Initialize the data analyzer."""
         self.status_mappings = {
-            'in_progress': ['In Progress', 'In Development', 'Development', 'Doing','Work In Progress','Active','In analysis','Analysis in progress','Implementation in progress'],
-            'testing': ['Testing','To Test', 'In Testing', 'Test', 'QA', 'Quality Assurance'],
-            'validation': ['Validation', 'To Validate', 'In Review', 'Review', 'Validation', 'Acceptance'],
-            'done': ['Done', 'Closed', 'Resolved', 'Complete', 'Finished', 'Completed', 'Delivered', 'Released', 'Close'],
-            'waiting': ['Waiting', 'New', 'Open', 'Accepted', 'Information needed', 'On Hold', 'Blocked', 'Pending','Deployment requested','Estimation', 'To Deploy', 'Waiting for Deployment', 'Waiting for Release', 'Waiting for Approval', 'Waiting for Feedback', 'Waiting for Review', 'Waiting for Test', 'Waiting for Validation']
+            'in_progress': ['In Progress', 'In Development', 'Development', 'Doing','Work In Progress','Active','In analysis',
+                            'Analysis in progress','Implementation in progress', 'Planning', 'realization', 'Executing'],
+            'testing': ['Testing','To Test', 'In Testing', 'Test', 'QA', 'Quality Assurance', 'Fixed'],
+            'validation': ['Validation', 'To Validate', 'In Review', 'Review', 'Validation', 'Acceptance', 'verify'],
+            'done': ['Done', 'Closed', 'Resolved', 'Complete', 'Finished', 'Completed', 'Delivered', 'Released', 'Close', 'PRD Deployed'
+                     ],
+            'waiting': ['Waiting', 'New', 'Open', 'Accepted', 'Information needed', 'On Hold', 'Blocked', 'Pending',
+                        'Deployment requested','Estimation', 'To Deploy', 'Waiting for Deployment', 'Waiting for Release', 
+                        'Waiting for Approval', 'Waiting for Feedback', 'Waiting for Review', 'Waiting for Test', 
+                        'Waiting for Validation', 'Analysis - Wait Customer','Need info', 'Authorization', 'GLOBAL BACKLOG', 'ToDo']
         }
         # Store discovered statuses for debugging
         self.discovered_statuses = set()

@@ -1,14 +1,28 @@
+# Sprint Analyzer Dependencies
+# Core web framework
 Flask==3.0.0
+Werkzeug==3.0.1
+
+# HTTP requests for Jira API
 requests==2.31.0
+responses==0.24.1
+
+# Data analysis and numerical operations
 pandas==2.1.4
 numpy==1.26.2
+scipy==1.11.4
+
+# Date and time utilities
+python-dateutil==2.8.2
+pytz==2023.3
+
+# PDF report generation
+reportlab==4.0.7
+
+# Visualization (optional)
 matplotlib==3.8.2
 seaborn==0.13.0
-scipy==1.11.4
+
+# Testing framework
 pytest==7.4.3
 pytest-flask==1.3.0
-python-dateutil==2.8.2
-reportlab==4.0.7
-Werkzeug==3.0.1
-responses==0.24.1
-pytz==2023.3
