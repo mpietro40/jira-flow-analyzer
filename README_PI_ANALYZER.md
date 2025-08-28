@@ -7,12 +7,12 @@ Il **PI Analysis Tool** è un'applicazione web completa per l'analisi delle metr
 ## Caratteristiche Principali
 
 ### 🔍 Scoperta Automatica dei Progetti
-- Parte dal progetto base ISDOP
+- Parte dal progetto base inserito nella configurazione
 - Identifica automaticamente progetti correlati tramite link parent/child delle sub-feature
 - Analizza tutti i progetti collegati in un'unica sessione
 
 ### 📊 Analisi Completa delle Metriche PI
-- **Conteggio per tipo di issue**: Bug, Story, Sub-task, Sub-Feature, Feature
+- **Conteggio per tipo di issue**: Bug, Story, Sub-task, Sub-Feature, Feature...
 - **Analisi delle stime**: Somma delle stime iniziali per ogni tipo
 - **Percentuale non stimata**: Calcolo della % di issue senza stime
 - **Breakdown per progetto**: Distribuzione del lavoro tra progetti
@@ -29,6 +29,8 @@ Il **PI Analysis Tool** è un'applicazione web completa per l'analisi delle metr
 - Visualizzazione real-time dei risultati
 - Cards colorate per diversi tipi di metriche
 - Download PDF con un click
+- Possibilita' di caricare un CSV con tutte le issue da analizzare (riduce il carico su Jira)
+- il file di configurazione poi consente di limitare le ricerche su singolo progetto per ridurre il carico
 
 ## Architettura del Sistema
 
@@ -73,6 +75,7 @@ PerseusLeadTime/
 │   └── pi_analyzer.html
 ├── static/
 │   └── logo.png
+|   └── favicon.ico
 ├── tests/
 │   └── test_pi_analyzer.py
 └── README_PI_ANALYZER.md
