@@ -120,7 +120,12 @@ class PIPDFReportGenerator:
             # Detailed analysis
             story.extend(self._create_detailed_analysis(analysis_data))
             
-            # Recommendations
+            # Coaching Recommendations (if available)
+            results = analysis_data.get('analysis_results', {})
+            if results.get('has_flow_metrics') and results.get('coaching_summary'):
+                story.extend(self._create_coaching_recommendations(analysis_data))
+            
+            # General Recommendations
             story.extend(self._create_recommendations(analysis_data))
             
             # Build PDF with custom canvas function
@@ -183,8 +188,12 @@ class PIPDFReportGenerator:
         content.append(Paragraph(f"Total Estimates: {total_days:.1f} days", self.styles['Normal']))
         content.append(Spacer(1, 0.2*inch))
         
-        # Base project info
-        content.append(Paragraph("Base Project: ISDOP", self.styles['Normal']))
+        # Configuration info
+        base_project = results.get('base_project', 'ISDOP')
+        excluded_projects = results.get('excluded_projects', [])
+        content.append(Paragraph(f"Base Project: {base_project}", self.styles['Normal']))
+        if excluded_projects:
+            content.append(Paragraph(f"Excluded Projects: {', '.join(excluded_projects)}", self.styles['Normal']))
         content.append(Spacer(1, 0.2*inch))
         
         return content
@@ -246,7 +255,7 @@ class PIPDFReportGenerator:
                     f"{data['unestimated_percentage']:.1f}%"
                 ])
             
-            # Use 85% of page width for table
+            # Use 95% of page width for table
             page_width = A4[0] - 144  # Subtract margins
             table_width = page_width * 0.95
             col_widths = [table_width * 0.25, table_width * 0.12, table_width * 0.15, 
@@ -256,7 +265,7 @@ class PIPDFReportGenerator:
             
             # Create alternating row colors
             table_style = [
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.darkgreen),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -271,7 +280,7 @@ class PIPDFReportGenerator:
             # Add alternating row colors
             for i in range(1, len(type_data)):
                 if i % 2 == 1:  # Odd rows (1, 3, 5...)
-                    table_style.append(('BACKGROUND', (0, i), (-1, i), colors.lightgrey))
+                    table_style.append(('BACKGROUND', (0, i), (-1, i), colors.lightgreen))
                 else:  # Even rows (2, 4, 6...)
                     table_style.append(('BACKGROUND', (0, i), (-1, i), colors.white))
             
@@ -307,7 +316,7 @@ class PIPDFReportGenerator:
             
             # Create alternating row colors
             project_style = [
-                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('BACKGROUND', (0, 0), (-1, 0), colors.darkorange),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
                 ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
                 ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
@@ -319,13 +328,85 @@ class PIPDFReportGenerator:
             # Add alternating row colors
             for i in range(1, len(project_data)):
                 if i % 2 == 1:  # Odd rows (1, 3, 5...)
-                    project_style.append(('BACKGROUND', (0, i), (-1, i), colors.lightgrey))
+                    project_style.append(('BACKGROUND', (0, i), (-1, i), colors.peachpuff))
                 else:  # Even rows (2, 4, 6...)
                     project_style.append(('BACKGROUND', (0, i), (-1, i), colors.white))
             
             project_table.setStyle(TableStyle(project_style))
             
             content.append(project_table)
+        
+        # Flow Metrics Analysis (if available)
+        if results.get('has_flow_metrics') and results.get('flow_metrics'):
+            content.append(PageBreak())
+            content.append(Paragraph("Flow Metrics Analysis", self.heading_style))
+            
+            flow_metrics = results.get('flow_metrics', {})
+            if flow_metrics:
+                # Create flow metrics table with shorter headers
+                flow_data = [['Project', 'WIP', 'Items/Week', 'Age (d)', 'Cycle (d)', 'Done', 'Total']]
+                
+                for project, metrics in flow_metrics.items():
+                    flow_data.append([
+                        project,
+                        str(metrics.get('work_in_progress', 0)),
+                        str(metrics.get('throughput_per_week', 0)),
+                        str(metrics.get('avg_work_item_age_days', 0)),
+                        str(metrics.get('avg_cycle_time_days', 0)),
+                        str(metrics.get('total_completed', 0)),
+                        str(metrics.get('total_issues', 0))
+                    ])
+                
+                # Use 95% of page width for flow metrics table
+                flow_table_width = page_width * 0.95
+                flow_col_widths = [
+                    flow_table_width * 0.25,  # Project
+                    flow_table_width * 0.1,   # WIP
+                    flow_table_width * 0.15,  # Items/Week
+                    flow_table_width * 0.12,  # Age
+                    flow_table_width * 0.12,  # Cycle
+                    flow_table_width * 0.13,  # Done
+                    flow_table_width * 0.13   # Total
+                ]
+                
+                flow_table = Table(flow_data, colWidths=flow_col_widths)
+                
+                # Create alternating row colors for flow table
+                flow_style = [
+                    ('BACKGROUND', (0, 0), (-1, 0), colors.darkblue),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+                    ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                    ('FONTSIZE', (0, 0), (-1, 0), 10),
+                    ('FONTSIZE', (0, 1), (-1, -1), 9),
+                    ('BOTTOMPADDING', (0, 0), (-1, 0), 8),
+                    ('TOPPADDING', (0, 0), (-1, 0), 8),
+                    ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                ]
+                
+                # Add alternating row colors
+                for i in range(1, len(flow_data)):
+                    if i % 2 == 1:  # Odd rows
+                        flow_style.append(('BACKGROUND', (0, i), (-1, i), colors.lightblue))
+                    else:  # Even rows
+                        flow_style.append(('BACKGROUND', (0, i), (-1, i), colors.white))
+                
+                flow_table.setStyle(TableStyle(flow_style))
+                content.append(flow_table)
+                
+                # Add flow metrics explanation
+                content.append(Spacer(1, 0.2*inch))
+                flow_explanation = """
+                <b>Flow Metrics Explanation:</b><br/>
+                • <b>WIP</b>: Work in Progress - Items started but not finished during PI<br/>
+                • <b>Throughput/Week</b>: Average number of items completed per week<br/>
+                • <b>Avg Age</b>: Average time from start to PI end for WIP items<br/>
+                • <b>Avg Cycle Time</b>: Average time from start to completion for finished items<br/>
+                • <b>Completed</b>: Number of items completed during PI period<br/>
+                • <b>Total Issues</b>: Total items analyzed (completed + WIP)
+                """
+                content.append(Paragraph(flow_explanation, self.styles['Normal']))
         
         return content
     
@@ -388,5 +469,73 @@ class PIPDFReportGenerator:
         for i, rec in enumerate(recommendations, 1):
             content.append(Paragraph(f"{i}. {rec}", self.styles['Normal']))
             content.append(Spacer(1, 0.1*inch))
+        
+        return content
+    def _create_coaching_recommendations(self, data: Dict) -> list:
+        """Create coaching recommendations section."""
+        content = []
+        
+        content.append(PageBreak())
+        content.append(Paragraph("Coaching Recommendations", self.title_style))
+        content.append(Spacer(1, 0.2*inch))
+        
+        results = data.get('analysis_results', {})
+        coaching_summary = results.get('coaching_summary', {})
+        
+        if not coaching_summary:
+            return content
+        
+        # Overall health status
+        health = coaching_summary.get('overall_health', 'Unknown')
+        critical_count = coaching_summary.get('critical_issues', 0)
+        warning_count = coaching_summary.get('warning_issues', 0)
+        
+        health_color = colors.green if health == 'Healthy' else colors.orange if health == 'Warning' else colors.red
+        
+        health_text = f"""
+        <b>Overall Flow Health: <font color="{health_color.hexval()}">{health}</font></b><br/>
+        Total Recommendations: {coaching_summary.get('total_recommendations', 0)} 
+        ({critical_count} critical, {warning_count} warnings)
+        """
+        content.append(Paragraph(health_text, self.styles['Normal']))
+        content.append(Spacer(1, 0.3*inch))
+        
+        # Project-specific recommendations
+        all_recommendations = coaching_summary.get('all_recommendations', [])
+        if all_recommendations:
+            # Group recommendations by project
+            project_recs = {}
+            for rec in all_recommendations:
+                project = rec.get('project', 'Unknown')
+                if project not in project_recs:
+                    project_recs[project] = []
+                project_recs[project].append(rec)
+            
+            # Create separate section for each project
+            for project, recs in project_recs.items():
+                content.append(Paragraph(f"{project} Project Issues", self.heading_style))
+                
+                for rec in recs:
+                    severity_color = colors.red if rec['severity'] == 'Critical' else colors.orange
+                    severity_icon = "⚠️" if rec['severity'] == 'Critical' else "⚡"
+                    
+                    rec_text = f"""
+                    <b>{severity_icon} {rec.get('metric', '')} - <font color="{severity_color.hexval()}">{rec.get('severity', '')}</font></b><br/>
+                    Current Value: {rec.get('current_value', '')} | Recommended Threshold: {rec.get('threshold', '')}<br/>
+                    <i>{rec.get('advice', '')}</i>
+                    """
+                    content.append(Paragraph(rec_text, self.styles['Normal']))
+                    content.append(Spacer(1, 0.15*inch))
+                
+                content.append(Spacer(1, 0.2*inch))
+        
+        # General flow principles
+        general_recs = coaching_summary.get('general_recommendations', [])
+        if general_recs:
+            content.append(Paragraph("General Flow Principles", self.heading_style))
+            
+            for rec in general_recs:
+                content.append(Paragraph(f"• {rec}", self.styles['Normal']))
+                content.append(Spacer(1, 0.05*inch))
         
         return content

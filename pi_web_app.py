@@ -42,6 +42,7 @@ def analyze_pi():
         access_token = request.form.get('access_token')
         pi_start_date = request.form.get('pi_start_date')
         pi_end_date = request.form.get('pi_end_date')
+        include_full_backlog = request.form.get('include_full_backlog') == 'on'
         
         # Validate inputs
         if not all([jira_url, access_token, pi_start_date, pi_end_date]):
@@ -65,7 +66,7 @@ def analyze_pi():
         logger.info(f"🔗 Starting PI analysis from {pi_start_date} to {pi_end_date}")
         
         # Perform PI analysis
-        analysis_results = pi_analyzer.analyze_pi(pi_start_date, pi_end_date)
+        analysis_results = pi_analyzer.analyze_pi(pi_start_date, pi_end_date, include_full_backlog)
         
         # Add request parameters for PDF generation
         analysis_results.update({

@@ -10,6 +10,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Set
 from collections import defaultdict
+import json
+import os
 
 # Reuse existing classes
 from jira_client import JiraClient
@@ -34,17 +36,58 @@ class PIAnalyzer:
             jira_client (JiraClient): Configured Jira client instance
         """
         self.jira_client = jira_client
-        self.base_project = "ISDOP"
-        self.completion_statuses = ['Done', 'Closed', 'Resolved']
-        self.issue_types = ['Bug', 'Story', 'Sub-task', 'Sub-Feature', 'Feature']
+        self._load_configuration()
     
-    def analyze_pi(self, pi_start_date: str, pi_end_date: str) -> Dict:
+    def _load_configuration(self):
+        """
+        Load configuration from pi_config.json file.
+        """
+        config_path = os.path.join(os.path.dirname(__file__), 'pi_config.json')
+        
+        # Default configuration
+        default_config = {
+            "base_project": "ISDOP",
+            "excluded_projects": ["E2ECD"],
+            "test_mode": {"enabled": False, "test_initiative_id": "ISDOP-2000"},
+            "completion_statuses": ["Done", "Closed", "Resolved"],
+            "in_progress_statuses": ["In Progress", "Doing", "Working", "Development"],
+            "issue_types": ["Bug", "Story", "Sub-task", "Sub-Feature", "Feature"]
+        }
+        
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                logger.info(f"📋 Loaded configuration from {config_path}")
+            else:
+                config = default_config
+                logger.info("📋 Using default configuration")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to load config, using defaults: {str(e)}")
+            config = default_config
+        
+        # Set configuration values
+        self.base_project = config.get("base_project", "ISDOP")
+        self.excluded_projects = set(config.get("excluded_projects", ["E2ECD"]))
+        self.test_mode = config.get("test_mode", {"enabled": False, "test_initiative_id": "ISDOP-2000"})
+        self.completion_statuses = config.get("completion_statuses", ["Done", "Closed", "Resolved"])
+        self.in_progress_statuses = config.get("in_progress_statuses", ["In Progress", "Doing", "Working", "Development"])
+        self.issue_types = config.get("issue_types", ["Bug", "Story", "Sub-task", "Sub-Feature", "Feature"])
+        self.flow_recommendations = config.get("flow_metrics_recommendations", {})
+        
+        logger.info(f"🎯 Base project: {self.base_project}")
+        logger.info(f"🚫 Excluded projects: {list(self.excluded_projects)}")
+        if self.test_mode.get("enabled", False):
+            logger.info(f"🧪 Test mode enabled: {self.test_mode.get('test_initiative_id')}")
+    
+    def analyze_pi(self, pi_start_date: str, pi_end_date: str, include_full_backlog: bool = False) -> Dict:
         """
         Analyze PI metrics for ISDOP and related projects.
         
         Args:
             pi_start_date (str): PI start date (YYYY-MM-DD format)
             pi_end_date (str): PI end date (YYYY-MM-DD format)
+            include_full_backlog (bool): Include full area backlog analysis with flow metrics
             
         Returns:
             Dict: Complete PI analysis results
@@ -60,8 +103,17 @@ class PIAnalyzer:
         # Step 3: Analyze metrics by issue type
         metrics = self._analyze_pi_metrics(pi_issues)
         
-        # Step 4: Create comprehensive report
-        report = self._create_pi_report(pi_start_date, pi_end_date, related_projects, metrics)
+        # Step 4: Full backlog analysis if requested
+        flow_metrics = None
+        if include_full_backlog:
+            # Get actual projects from completed issues for flow analysis
+            actual_projects = set(metrics.get('by_project', {}).keys())
+            # Filter out excluded projects
+            actual_projects = actual_projects - self.excluded_projects
+            flow_metrics = self._analyze_flow_metrics(pi_start_date, pi_end_date, actual_projects)
+        
+        # Step 5: Create comprehensive report
+        report = self._create_pi_report(pi_start_date, pi_end_date, related_projects, metrics, flow_metrics)
         
         logger.info("✅ PI analysis completed successfully")
         return report
@@ -79,23 +131,38 @@ class PIAnalyzer:
     
     def _get_isdop_initiatives(self) -> List[Dict]:
         """
-        Get all Business Initiatives from ISDOP project.
+        Get Business Initiatives from ISDOP project.
+        In test mode, returns only the specified test initiative.
         
         Returns:
             List[Dict]: List of business initiative issues
         """
-        logger.info(f"🎯 Fetching business initiatives from ISDOP")
-        
-        jql_query = 'project = ISDOP AND issuetype = "Business Initiative"'
-        
-        try:
-            initiatives = self.jira_client.fetch_issues(jql_query, max_results=500)
-            logger.info(f"📊 Found {len(initiatives)} business initiatives")
-            return initiatives
+        if self.test_mode.get("enabled", False):
+            test_id = self.test_mode.get("test_initiative_id", "ISDOP-2000")
+            logger.info(f"🧪 Test mode: Fetching single initiative {test_id}")
             
-        except Exception as e:
-            logger.error(f"🚩 Failed to fetch initiatives: {str(e)}")
-            return []
+            jql_query = f'key = "{test_id}"'
+            
+            try:
+                initiatives = self.jira_client.fetch_issues(jql_query, max_results=1)
+                logger.info(f"📊 Test mode: Found {len(initiatives)} initiative(s)")
+                return initiatives
+            except Exception as e:
+                logger.error(f"🚩 Failed to fetch test initiative: {str(e)}")
+                return []
+        else:
+            logger.info(f"🎯 Fetching all business initiatives from ISDOP")
+            
+            jql_query = 'project = ISDOP AND issuetype = "Business Initiative"'
+            
+            try:
+                initiatives = self.jira_client.fetch_issues(jql_query, max_results=500)
+                logger.info(f"📊 Found {len(initiatives)} business initiatives")
+                return initiatives
+                
+            except Exception as e:
+                logger.error(f"🚩 Failed to fetch initiatives: {str(e)}")
+                return []
     
 
     
@@ -155,7 +222,7 @@ class PIAnalyzer:
         Returns:
             List[Dict]: List of completed child issues
         """
-        status_list = ','.join(self.completion_statuses)
+        status_list = ','.join([f'"{status}"' for status in self.completion_statuses])
         
         jql_query = (f'issuekey in childIssuesOf("{initiative_key}") '
                     f'AND resolved >= "{start_date}" '
@@ -207,7 +274,7 @@ class PIAnalyzer:
         Returns:
             List[Dict]: List of completed ISDOP issues
         """
-        status_list = ','.join(self.completion_statuses)
+        status_list = ','.join([f'"{status}"' for status in self.completion_statuses])
         
         jql_query = (f'project = {self.base_project} '
                     f'AND resolved >= "{start_date}" '
@@ -371,7 +438,216 @@ class PIAnalyzer:
         
         return dict(metrics)
     
-    def _create_pi_report(self, start_date: str, end_date: str, projects: Set[str], metrics: Dict) -> Dict:
+    def _analyze_flow_metrics(self, start_date: str, end_date: str, projects: Set[str]) -> Dict:
+        """
+        Analyze flow metrics for each area backlog.
+        
+        Args:
+            start_date (str): PI start date
+            end_date (str): PI end date
+            projects (Set[str]): Related projects
+            
+        Returns:
+            Dict: Flow metrics by project
+        """
+        logger.info(f"🔄 Analyzing flow metrics for {len(projects)} areas")
+        
+        flow_metrics = {}
+        
+        for project in projects:
+            logger.info(f"📊 Analyzing flow metrics for {project}")
+            
+            # Get all issues in project during PI period
+            all_issues = self._fetch_project_flow_issues(project, start_date, end_date)
+            
+            if all_issues:
+                project_metrics = self._calculate_project_flow_metrics(project, all_issues, start_date, end_date)
+                flow_metrics[project] = project_metrics
+        
+        return flow_metrics
+    
+    def _fetch_project_flow_issues(self, project: str, start_date: str, end_date: str) -> List[Dict]:
+        """
+        Fetch all issues for flow metrics analysis.
+        
+        Args:
+            project (str): Project key
+            start_date (str): PI start date
+            end_date (str): PI end date
+            
+        Returns:
+            List[Dict]: All relevant issues
+        """
+        # Get completed issues
+        completed_jql = (f'project = {project} '
+                        f'AND resolved >= "{start_date}" '
+                        f'AND resolved <= "{end_date}"')
+        
+        # Get in-progress issues
+        in_progress_statuses = ','.join([f'"{status}"' for status in self.in_progress_statuses])
+        wip_jql = (f'project = {project} '
+                  f'AND status IN ({in_progress_statuses}) '
+                  f'AND created <= "{end_date}"')
+        
+        all_issues = []
+        
+        try:
+            # Fetch completed issues
+            completed_issues = self.jira_client.fetch_issues(completed_jql, max_results=1000)
+            all_issues.extend(completed_issues)
+            
+            # Fetch WIP issues
+            wip_issues = self.jira_client.fetch_issues(wip_jql, max_results=1000)
+            all_issues.extend(wip_issues)
+            
+            # Enhance with detailed data
+            enhanced_issues = []
+            for issue in all_issues:
+                enhanced = self._enhance_issue_with_flow_data(issue)
+                if enhanced:
+                    enhanced_issues.append(enhanced)
+            
+            return enhanced_issues
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to fetch flow issues for {project}: {str(e)}")
+            return []
+    
+    def _enhance_issue_with_flow_data(self, issue: Dict) -> Optional[Dict]:
+        """
+        Enhance issue with flow metrics data.
+        
+        Args:
+            issue (Dict): Basic issue data
+            
+        Returns:
+            Optional[Dict]: Enhanced issue with flow data
+        """
+        try:
+            response = self.jira_client.session.get(
+                f"{self.jira_client.base_url}/rest/api/2/issue/{issue['key']}",
+                params={'fields': 'created,resolutiondate,status,changelog', 'expand': 'changelog'}
+            )
+            
+            if response.status_code != 200:
+                return issue
+            
+            detailed_data = response.json()
+            fields = detailed_data.get('fields', {})
+            
+            # Calculate flow metrics
+            created_date = fields.get('created')
+            resolved_date = fields.get('resolutiondate')
+            current_status = fields.get('status', {}).get('name', '')
+            
+            # Find first in-progress date from changelog
+            in_progress_date = self._find_in_progress_date(detailed_data.get('changelog', {}))
+            
+            issue.update({
+                'created_date': created_date,
+                'resolved_date': resolved_date,
+                'current_status': current_status,
+                'in_progress_date': in_progress_date,
+                'is_completed': resolved_date is not None,
+                'is_wip': current_status in self.in_progress_statuses
+            })
+            
+            return issue
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to enhance flow data for {issue.get('key', 'unknown')}: {str(e)}")
+            return issue
+    
+    def _find_in_progress_date(self, changelog: Dict) -> Optional[str]:
+        """
+        Find the first date when issue moved to in-progress status.
+        
+        Args:
+            changelog (Dict): Issue changelog
+            
+        Returns:
+            Optional[str]: First in-progress date
+        """
+        histories = changelog.get('histories', [])
+        
+        for history in histories:
+            for item in history.get('items', []):
+                if (item.get('field') == 'status' and 
+                    item.get('toString') in self.in_progress_statuses):
+                    return history.get('created')
+        
+        return None
+    
+    def _calculate_project_flow_metrics(self, project: str, issues: List[Dict], start_date: str, end_date: str) -> Dict:
+        """
+        Calculate flow metrics for a project.
+        
+        Args:
+            project (str): Project key
+            issues (List[Dict]): Project issues
+            start_date (str): PI start date
+            end_date (str): PI end date
+            
+        Returns:
+            Dict: Flow metrics
+        """
+        from datetime import datetime, timedelta
+        import statistics
+        
+        completed_issues = [i for i in issues if i.get('is_completed', False)]
+        wip_issues = [i for i in issues if i.get('is_wip', False)]
+        
+        # 1. Work in Progress
+        wip_count = len(wip_issues)
+        
+        # 2. Throughput (items per week)
+        pi_start = datetime.strptime(start_date, '%Y-%m-%d')
+        pi_end = datetime.strptime(end_date, '%Y-%m-%d')
+        pi_weeks = (pi_end - pi_start).days / 7
+        throughput = len(completed_issues) / max(pi_weeks, 1)
+        
+        # 3. Work Item Age (for WIP items)
+        ages = []
+        for issue in wip_issues:
+            if issue.get('in_progress_date'):
+                try:
+                    start_dt = datetime.fromisoformat(issue['in_progress_date'].replace('Z', '+00:00')).replace(tzinfo=None)
+                    age_days = (pi_end - start_dt).days
+                    ages.append(max(age_days, 0))
+                except Exception:
+                    continue
+        
+        avg_age = statistics.mean(ages) if ages else 0
+        
+        # 4. Cycle Time (for completed items)
+        cycle_times = []
+        for issue in completed_issues:
+            if issue.get('in_progress_date') and issue.get('resolved_date'):
+                try:
+                    start_dt = datetime.fromisoformat(issue['in_progress_date'].replace('Z', '+00:00')).replace(tzinfo=None)
+                    end_dt = datetime.fromisoformat(issue['resolved_date'].replace('Z', '+00:00')).replace(tzinfo=None)
+                    cycle_days = (end_dt - start_dt).days
+                    cycle_times.append(max(cycle_days, 0))
+                except Exception:
+                    continue
+        
+        avg_cycle_time = statistics.mean(cycle_times) if cycle_times else 0
+        
+        metrics = {
+            'work_in_progress': wip_count,
+            'throughput_per_week': round(throughput, 2),
+            'avg_work_item_age_days': round(avg_age, 1),
+            'avg_cycle_time_days': round(avg_cycle_time, 1),
+            'total_completed': len(completed_issues),
+            'total_issues': len(issues)
+        }
+        
+        # Add coaching recommendations
+        metrics['coaching_recommendations'] = self._generate_coaching_recommendations(metrics)
+        
+        return metrics
+    
+    def _create_pi_report(self, start_date: str, end_date: str, projects: Set[str], metrics: Dict, flow_metrics: Optional[Dict] = None) -> Dict:
         """
         Create comprehensive PI analysis report.
         
@@ -385,9 +661,9 @@ class PIAnalyzer:
             Dict: Complete PI report
         """
         # Get actual projects from the metrics (where issues were found)
-        actual_projects = list(metrics.get('by_project', {}).keys())
+        actual_projects = [p for p in metrics.get('by_project', {}).keys() if p not in self.excluded_projects]
         
-        return {
+        report = {
             'pi_period': {
                 'start_date': start_date,
                 'end_date': end_date,
@@ -396,6 +672,7 @@ class PIAnalyzer:
             },
             'analyzed_projects': sorted(actual_projects),
             'base_project': self.base_project,
+            'excluded_projects': list(self.excluded_projects),
             'analysis_date': datetime.now().isoformat(),
             'metrics': metrics,
             'summary': {
@@ -404,4 +681,127 @@ class PIAnalyzer:
                 'total_estimate_hours': metrics['summary']['total_estimate_hours'],
                 'unestimated_percentage': metrics['summary']['overall_unestimated_percentage']
             }
+        }
+        
+        # Add flow metrics if available
+        if flow_metrics:
+            report['flow_metrics'] = flow_metrics
+            report['has_flow_metrics'] = True
+            # Add overall coaching summary
+            report['coaching_summary'] = self._generate_overall_coaching_summary(flow_metrics)
+        else:
+            report['has_flow_metrics'] = False
+        
+        return report
+    def _generate_coaching_recommendations(self, metrics: Dict) -> List[Dict]:
+        """
+        Generate coaching recommendations based on flow metrics.
+        
+        Args:
+            metrics (Dict): Project flow metrics
+            
+        Returns:
+            List[Dict]: List of coaching recommendations
+        """
+        recommendations = []
+        
+        if not self.flow_recommendations:
+            return recommendations
+        
+        # WIP Analysis
+        wip = metrics.get('work_in_progress', 0)
+        wip_config = self.flow_recommendations.get('wip_limits', {})
+        if wip > wip_config.get('critical_threshold', 15):
+            recommendations.append({
+                'metric': 'Work in Progress',
+                'severity': 'Critical',
+                'current_value': wip,
+                'threshold': wip_config.get('critical_threshold', 15),
+                'advice': wip_config.get('coaching_advice', 'Implement WIP limits')
+            })
+        elif wip > wip_config.get('warning_threshold', 10):
+            recommendations.append({
+                'metric': 'Work in Progress',
+                'severity': 'Warning',
+                'current_value': wip,
+                'threshold': wip_config.get('warning_threshold', 10),
+                'advice': wip_config.get('coaching_advice', 'Consider WIP limits')
+            })
+        
+        # Cycle Time Analysis
+        cycle_time = metrics.get('avg_cycle_time_days', 0)
+        cycle_config = self.flow_recommendations.get('cycle_time', {})
+        if cycle_time > cycle_config.get('critical_threshold', 30):
+            recommendations.append({
+                'metric': 'Cycle Time',
+                'severity': 'Critical',
+                'current_value': f"{cycle_time:.1f} days",
+                'threshold': f"{cycle_config.get('critical_threshold', 30)} days",
+                'advice': cycle_config.get('coaching_advice', 'Break down work items')
+            })
+        elif cycle_time > cycle_config.get('warning_threshold', 21):
+            recommendations.append({
+                'metric': 'Cycle Time',
+                'severity': 'Warning',
+                'current_value': f"{cycle_time:.1f} days",
+                'threshold': f"{cycle_config.get('warning_threshold', 21)} days",
+                'advice': cycle_config.get('coaching_advice', 'Review work sizing')
+            })
+        
+        # Work Item Age Analysis
+        age = metrics.get('avg_work_item_age_days', 0)
+        age_config = self.flow_recommendations.get('work_item_age', {})
+        if age > age_config.get('critical_threshold', 21):
+            recommendations.append({
+                'metric': 'Work Item Age',
+                'severity': 'Critical',
+                'current_value': f"{age:.1f} days",
+                'threshold': f"{age_config.get('critical_threshold', 21)} days",
+                'advice': age_config.get('coaching_advice', 'Address blocked items')
+            })
+        elif age > age_config.get('warning_threshold', 14):
+            recommendations.append({
+                'metric': 'Work Item Age',
+                'severity': 'Warning',
+                'current_value': f"{age:.1f} days",
+                'threshold': f"{age_config.get('warning_threshold', 14)} days",
+                'advice': age_config.get('coaching_advice', 'Review aging items')
+            })
+        
+        return recommendations
+    
+    def _generate_overall_coaching_summary(self, flow_metrics: Dict) -> Dict:
+        """
+        Generate overall coaching summary across all projects.
+        
+        Args:
+            flow_metrics (Dict): Flow metrics for all projects
+            
+        Returns:
+            Dict: Overall coaching summary
+        """
+        all_recommendations = []
+        critical_count = 0
+        warning_count = 0
+        
+        for project, metrics in flow_metrics.items():
+            project_recommendations = metrics.get('coaching_recommendations', [])
+            for rec in project_recommendations:
+                rec['project'] = project
+                all_recommendations.append(rec)
+                if rec['severity'] == 'Critical':
+                    critical_count += 1
+                elif rec['severity'] == 'Warning':
+                    warning_count += 1
+        
+        # Get general recommendations from config
+        general_advice = self.flow_recommendations.get('general_recommendations', [])
+        
+        return {
+            'total_recommendations': len(all_recommendations),
+            'critical_issues': critical_count,
+            'warning_issues': warning_count,
+            'all_recommendations': all_recommendations,
+            'general_recommendations': general_advice,
+            'overall_health': 'Critical' if critical_count > 0 else 'Warning' if warning_count > 0 else 'Healthy'
         }

@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import json
+import time
 
 # Configure logger with proper name
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
@@ -18,7 +19,7 @@ class JiraClient:
     Client for connecting to Jira API and retrieving issue data.
     
     This class handles authentication, API requests, and data parsing
-    for Jira issue analysis.
+    for Jira issue analysis and Epic tracking.
     """
     
     def __init__(self, base_url: str, access_token: str):
@@ -35,22 +36,79 @@ class JiraClient:
         self.session.headers.update({
             'Authorization': f'Bearer {access_token}',
             'Content-Type': 'application/json',
-            'Accept': 'application/json'
+            'Accept': 'application/json',
+            'User-Agent': 'JiraObeyaEpicAnalyzer/1.0'
         })
+        
+        # Connection settings for production
+        self.timeout = (10, 30)  # (connect, read) timeouts
+        self.max_retries = 3
+        self.retry_delay = 1  # seconds
     
     def test_connection(self) -> bool:
         """
-        Test connection to Jira server.
+        Test connection to Jira server with timeout and retry.
         
         Returns:
             bool: True if connection successful, False otherwise
         """
+        for attempt in range(self.max_retries):
+            try:
+                response = self.session.get(
+                    f'{self.base_url}/rest/api/2/myself',
+                    timeout=self.timeout
+                )
+                if response.status_code == 200:
+                    return True
+                elif response.status_code == 401:
+                    logger.error("🚩 Authentication failed - invalid token")
+                    return False
+                elif response.status_code == 403:
+                    logger.error("🚩 Access forbidden - insufficient permissions")
+                    return False
+                    
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                logger.warning(f"⏰ Connection issue (attempt {attempt + 1}/{self.max_retries}): {str(e)}")
+                if attempt < self.max_retries - 1:
+                    time.sleep(self.retry_delay * (attempt + 1))
+            except Exception as e:
+                logger.error(f"🚩 Connection test failed: {str(e)}")
+                return False
+                
+        return False
+    
+    def get_epic_children(self, epic_key: str) -> List[Dict]:
+        """
+        Fetch all issues linked to an epic.
+        
+        Args:
+            epic_key (str): The key of the epic
+            
+        Returns:
+            List[Dict]: List of child issues
+        """
+        logger.info(f"🔍 Fetching child issues for epic: {epic_key}")
+        
         try:
-            response = self.session.get(f'{self.base_url}/rest/api/2/myself')
-            return response.status_code == 200
+            # Get issues in the epic
+            jql = f"'Epic Link' = {epic_key}"
+            params = {
+                'jql': jql,
+                'maxResults': 500,  # Adjust if needed
+                'fields': 'key,summary,status,timeoriginalestimate,timeestimate'
+            }
+            
+            response = self.session.get(
+                f'{self.base_url}/rest/api/2/search',
+                params=params
+            )
+            response.raise_for_status()
+            
+            return response.json().get('issues', [])
+            
         except Exception as e:
-            logger.error(f"🚩 Connection test failed: {str(e)}")
-            return False
+            logger.error(f"Error fetching epic children for {epic_key}: {str(e)}")
+            return []
         
     ## Fetch issues based on JQL query
     ## This method retrieves issues from Jira using a JQL query.
@@ -80,12 +138,13 @@ class JiraClient:
                     'startAt': current_start,
                     'maxResults': min(200, max_results - len(issues)),
                     'expand': 'changelog',
-                    'fields': 'key,summary,status,created,resolutiondate,assignee,priority,issuetype'
+                    'fields': 'key,summary,status,created,resolutiondate,assignee,priority,issuetype,timeoriginalestimate,timeestimate'
                 }
                 
                 response = self.session.get(
                     f'{self.base_url}/rest/api/2/search',
-                    params=params
+                    params=params,
+                    timeout=self.timeout
                 )
                 response.raise_for_status()
                 
@@ -138,6 +197,7 @@ class JiraClient:
                 'created': fields.get('created'),
                 'resolution_date': fields.get('resolutiondate'),
                 'assignee': fields.get('assignee', {}).get('displayName', '') if fields.get('assignee') else '',
+                'fields': fields,  # Include raw fields for estimate access
                 'status_history': []
             }
             
@@ -160,6 +220,49 @@ class JiraClient:
             logger.warning(f"⚠️ Failed to process issue {issue.get('key', 'unknown')}: {str(e)}")
             return None
         
+    def update_issue_estimates(self, issue_key: str, original_estimate: str, remaining_estimate: str = None) -> bool:
+        """
+        Update issue time estimates using Jira API.
+        
+        Args:
+            issue_key (str): The issue key to update
+            original_estimate (str): Original estimate in Jira format (e.g., "4h", "2d", "30m")
+            remaining_estimate (str, optional): Remaining estimate, defaults to original_estimate
+            
+        Returns:
+            bool: True if update successful, False otherwise
+        """
+        if remaining_estimate is None:
+            remaining_estimate = original_estimate
+            
+        try:
+            # Use the fields format for updating time tracking
+            payload = {
+                "fields": {
+                    "timetracking": {
+                        "originalEstimate": original_estimate,
+                        "remainingEstimate": remaining_estimate
+                    }
+                }
+            }
+            
+            response = self.session.put(
+                f'{self.base_url}/rest/api/2/issue/{issue_key}',
+                json=payload,
+                timeout=self.timeout
+            )
+            
+            if response.status_code == 204:
+                logger.info(f"✅ Updated estimates for {issue_key}: {original_estimate}")
+                return True
+            else:
+                logger.error(f"🚩 Failed to update {issue_key}: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"🚩 Error updating estimates for {issue_key}: {str(e)}")
+            return False
+    
     # Parse CSV file for issue keys
     def parse_csv_for_issue_keys(self, csv_file) -> List[str]:
         """

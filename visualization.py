@@ -35,6 +35,150 @@ class VisualizationGenerator:
         """Initialize the visualization generator."""
         self.figure_size = (12, 8)
         self.dpi = 100
+        self.colors = plt.cm.Set3(np.linspace(0, 1, 12))  # Color palette for pie charts
+    
+    def create_pie_chart(self, data: List[Dict], title: str) -> io.BytesIO:
+        """
+        Create a pie chart for epic size distribution.
+        
+        Args:
+            data (List[Dict]): List of epic data dictionaries
+            title (str): Chart title
+            
+        Returns:
+            io.BytesIO: PNG image buffer
+        """
+        try:
+            plt.figure(figsize=(10, 8), dpi=self.dpi)
+            
+            # Group epics by size
+            size_ranges = {
+                'XS (0-40h)': (0, 40),
+                'S (40-80h)': (40, 80),
+                'M (80-160h)': (80, 160),
+                'L (160-320h)': (160, 320),
+                'XL (320h+)': (320, float('inf'))
+            }
+            
+            # Count epics in each size range
+            size_counts = {label: 0 for label in size_ranges.keys()}
+            for epic in data:
+                estimate = epic.get('original_estimate', 0)
+                for label, (min_hours, max_hours) in size_ranges.items():
+                    if min_hours <= estimate < max_hours:
+                        size_counts[label] += 1
+                        break
+            
+            # Remove empty categories
+            size_counts = {k: v for k, v in size_counts.items() if v > 0}
+            
+            # Create pie chart
+            if size_counts:
+                wedges, texts, autotexts = plt.pie(size_counts.values(), 
+                       autopct='%1.1f%%',
+                       colors=self.colors,
+                       startangle=90,
+                       pctdistance=0.8)
+                
+                # Style percentage text
+                for autotext in autotexts:
+                    autotext.set_color('white')
+                    autotext.set_fontsize(10)
+                    autotext.set_fontweight('bold')
+                
+                # Create legend with labels and counts
+                legend_labels = [f"{k} ({v} epics)" for k, v in size_counts.items()]
+                plt.legend(wedges, legend_labels, title="Epic Sizes", loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
+                
+                plt.title(title, pad=20, fontsize=14, fontweight='bold')
+            else:
+                plt.text(0.5, 0.5, "No data available", ha='center', va='center')
+                plt.axis('off')
+            
+            # Save to buffer
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png', bbox_inches='tight')
+            buffer.seek(0)
+            plt.close()
+            
+            return buffer
+            
+        except Exception as e:
+            logger.error(f"Error creating pie chart: {str(e)}")
+            # Create a simple error chart
+            plt.figure(figsize=(8, 6))
+            plt.text(0.5, 0.5, f"Chart Generation Error:\n{str(e)}", 
+                    ha='center', va='center', wrap=True)
+            plt.axis('off')
+            
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png')
+            buffer.seek(0)
+            plt.close()
+            
+            return buffer
+
+    def create_bar_chart(self, labels: List[str], data_series: List[List[float]], title: str, 
+                        ylabel: str, series_labels: List[str] = None) -> io.BytesIO:
+        """
+        Create a bar chart comparing multiple data series.
+        
+        Args:
+            labels (List[str]): X-axis labels
+            data_series (List[List[float]]): List of data series to plot
+            title (str): Chart title
+            ylabel (str): Y-axis label
+            series_labels (List[str]): Labels for each data series
+            
+        Returns:
+            io.BytesIO: PNG image buffer
+        """
+        try:
+            plt.figure(figsize=self.figure_size, dpi=self.dpi)
+            
+            # Calculate bar positions
+            num_series = len(data_series)
+            bar_width = 0.8 / num_series
+            indices = np.arange(len(labels))
+            
+            # Plot each series
+            for i, series in enumerate(data_series):
+                position = indices + (i - num_series/2 + 0.5) * bar_width
+                plt.bar(position, series, bar_width, 
+                       label=series_labels[i] if series_labels else f'Series {i+1}')
+            
+            plt.title(title)
+            plt.xlabel('Epics')
+            plt.ylabel(ylabel)
+            plt.xticks(indices, labels, rotation=45, ha='right')
+            
+            if series_labels:
+                plt.legend()
+                
+            plt.tight_layout()
+            
+            # Save to buffer
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png')
+            buffer.seek(0)
+            plt.close()
+            
+            return buffer
+            
+        except Exception as e:
+            logger.error(f"Error creating bar chart: {str(e)}")
+            # Create a simple error chart
+            plt.figure(figsize=(8, 6))
+            plt.text(0.5, 0.5, f"Chart Generation Error:\n{str(e)}", 
+                    ha='center', va='center', wrap=True)
+            plt.axis('off')
+            
+            buffer = io.BytesIO()
+            plt.savefig(buffer, format='png')
+            buffer.seek(0)
+            plt.close()
+            
+            return buffer
     
     def generate_all_charts(self, analysis_results: Dict) -> Dict:
         """
