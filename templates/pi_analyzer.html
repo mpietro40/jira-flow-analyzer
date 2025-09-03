@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PI Analysis Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        .type-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .project-card {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+        }
+        .flow-card {
+            background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+            color: #333;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            border: 2px solid #ddd;
+        }
+        .coaching-card {
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            border-left: 5px solid;
+        }
+        .coaching-critical {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+            color: #721c24;
+        }
+        .coaching-warning {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            color: #856404;
+        }
+        .coaching-healthy {
+            background: #d4edda;
+            border-left-color: #28a745;
+            color: #155724;
+        }
+        .health-badge {
+            font-size: 1.2em;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        .health-critical { background: #dc3545; color: white; }
+        .health-warning { background: #ffc107; color: #212529; }
+        .health-healthy { background: #28a745; color: white; }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <header class="bg-primary text-white py-2 px-4 mb-4">
+                    <div class="d-flex align-items-center">
+                        <img src="{{ url_for('static', filename='logo.png') }}" alt="PI Analyzer" style="height: 60px; margin-right: 20px;">
+                        <div>
+                            <h1><i class="fas fa-chart-pie"></i> PI Analysis Dashboard</h1>
+                            <p class="mb-0">Analyze Program Increment metrics for jira base project configured and related projects</p>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Input Form -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3><i class="fas fa-cog"></i> PI Analysis Parameters</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="piAnalysisForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="jira_url" class="form-label">Jira Server URL</label>
+                                        <input type="url" class="form-control" id="jira_url" name="jira_url" 
+                                               placeholder="https://your-company.atlassian.net" required>
+                                        <div class="form-text">Enter your Jira server URL</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="access_token" class="form-label">Access Token (PAT)</label>
+                                        <input type="password" class="form-control" id="access_token" name="access_token" 
+                                               placeholder="Your API token" required>
+                                        <div class="form-text">Personal Access Token for authentication</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="pi_start_date" class="form-label">PI Start Date</label>
+                                        <input type="date" class="form-control" id="pi_start_date" name="pi_start_date" required>
+                                        <div class="form-text">Program Increment start date</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="pi_end_date" class="form-label">PI End Date</label>
+                                        <input type="date" class="form-control" id="pi_end_date" name="pi_end_date" required>
+                                        <div class="form-text">Program Increment end date</div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="include_full_backlog" name="include_full_backlog">
+                                        <label class="form-check-label" for="include_full_backlog">
+                                            <strong>Full Area Backlog Analysis</strong>
+                                        </label>
+                                        <div class="form-text">Include flow metrics analysis (WIP, Throughput, Work Item Age, Cycle Time) for all area backlogs</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-play"></i> Analyze PI
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loading" class="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Analyzing PI data and discovering related projects...</p>
+                </div>
+
+                <!-- Configuration Display -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3><i class="fas fa-info-circle"></i> Current Configuration</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <h6><i class="fas fa-bullseye"></i> Base Project</h6>
+                                <span class="badge bg-primary">ISDOP</span>
+                            </div>
+                            <div class="col-md-3">
+                                <h6><i class="fas fa-ban"></i> Excluded Projects</h6>
+                                <span class="badge bg-danger">E2ECD</span>
+                            </div>
+                            <div class="col-md-3">
+                                <h6><i class="fas fa-check-circle"></i> Completion Statuses</h6>
+                                <div>
+                                    <span class="badge bg-success me-1">Done</span>
+                                    <span class="badge bg-success me-1">Closed</span>
+                                    <span class="badge bg-success me-1">Resolved</span>
+                                    <span class="badge bg-success me-1">PRD Deployed</span>
+                                    <span class="badge bg-success me-1">Deployed</span>
+                                    <span class="badge bg-success me-1">Released</span>
+                                    <span class="badge bg-success me-1">Completed</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <h6><i class="fas fa-spinner"></i> In-Progress Statuses</h6>
+                                <div>
+                                    <span class="badge bg-warning me-1">In Progress</span>
+                                    <span class="badge bg-warning me-1">Doing</span>
+                                    <span class="badge bg-warning me-1">Working</span>
+                                    <span class="badge bg-warning me-1">Development</span>
+                                    <span class="badge bg-warning me-1">Work In Progress</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <h6><i class="fas fa-tags"></i> Issue Types to Analyze</h6>
+                                <div>
+                                    <span class="badge bg-secondary me-1">Bug</span>
+                                    <span class="badge bg-secondary me-1">Analysis</span>
+                                    <span class="badge bg-secondary me-1">Configuration</span>
+                                    <span class="badge bg-secondary me-1">Defect (Sub-Task)</span>
+                                    <span class="badge bg-secondary me-1">Documentation</span>
+                                    <span class="badge bg-secondary me-1">Epic</span>
+                                    <span class="badge bg-secondary me-1">Evolution</span>
+                                    <span class="badge bg-secondary me-1">Feature</span>
+                                    <span class="badge bg-secondary me-1">Improvement</span>
+                                    <span class="badge bg-secondary me-1">Story</span>
+                                    <span class="badge bg-secondary me-1">Sub-Feature</span>
+                                    <span class="badge bg-secondary me-1">Sub-task</span>
+                                    <span class="badge bg-secondary me-1">Task</span>
+                                    <span class="badge bg-secondary me-1">Technical Improvement</span>
+                                    <span class="badge bg-secondary me-1">Technical subtask</span>
+                                    <span class="badge bg-secondary me-1">Technical task</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="alert alert-info mt-3">
+                            <i class="fas fa-lightbulb"></i> 
+                            <strong>Configuration Source:</strong> These settings are loaded from <code>pi_config.json</code>. 
+                            The analyzer will scan <strong>ISDOP</strong> Business Initiatives and their child issues, 
+                            excluding projects like <strong>E2ECD</strong>.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Results Section -->
+                <div id="results" style="display: none;">
+                    <!-- Summary Metrics -->
+                    <div id="summarySection" class="row mb-4">
+                        <!-- Summary cards will be populated here -->
+                    </div>
+
+                    <!-- Issue Type Breakdown -->
+                    <div id="typeSection" class="mb-4">
+                        <h3><i class="fas fa-tasks"></i> Issue Type Analysis</h3>
+                        <div id="typeCards" class="row">
+                            <!-- Type cards will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Project Breakdown -->
+                    <div id="projectSection" class="mb-4">
+                        <h3><i class="fas fa-project-diagram"></i> Project Analysis</h3>
+                        <div id="projectCards" class="row">
+                            <!-- Project cards will be populated here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Flow Metrics Section -->
+                    <div id="flowMetricsSection" class="mb-4" style="display: none;">
+                        <h3><i class="fas fa-stream"></i> Flow Metrics Analysis</h3>
+                        <div id="flowMetricsCards" class="row">
+                            <!-- Flow metrics cards will be populated here -->
+                        </div>
+                    </div>
+                    
+                    <!-- Coaching Recommendations Section -->
+                    <div id="coachingSection" class="mb-4" style="display: none;">
+                        <h3><i class="fas fa-lightbulb"></i> Agile Coaching Recommendations</h3>
+                        <div id="coachingOverview" class="mb-3">
+                            <!-- Overall coaching health will be populated here -->
+                        </div>
+                        <div id="coachingCards" class="row">
+                            <!-- Coaching recommendation cards will be populated here -->
+                        </div>
+                        <div id="generalRecommendations" class="mt-3">
+                            <!-- General agile recommendations will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Download Report Button -->
+                    <div class="text-center mt-4">
+                        <button id="downloadReport" class="btn btn-success btn-lg">
+                            <i class="fas fa-download"></i> Download PDF Report
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Messages -->
+                <div id="messages"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let analysisResults = null;
+
+        document.getElementById('piAnalysisForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('messages').innerHTML = '';
+            
+            fetch('/analyze_pi', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    analysisResults = data;
+                    displayResults(data.analysis_results);
+                    showMessage('PI Analysis completed successfully!', 'success');
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showMessage(`Network error: ${error.message}`, 'error');
+            });
+        });
+
+        function displayResults(results) {
+            // Display summary metrics
+            displaySummaryMetrics(results);
+            
+            // Display issue type breakdown
+            displayTypeBreakdown(results.metrics.by_type);
+            
+            // Display project breakdown
+            displayProjectBreakdown(results.metrics.by_project);
+            
+            // Display flow metrics if available
+            if (results.has_flow_metrics && results.flow_metrics) {
+                displayFlowMetrics(results.flow_metrics);
+                
+                // Display coaching recommendations if available
+                if (results.coaching_summary) {
+                    displayCoachingRecommendations(results.coaching_summary);
+                }
+            }
+            
+            document.getElementById('results').style.display = 'block';
+        }
+
+        function displaySummaryMetrics(results) {
+            const summarySection = document.getElementById('summarySection');
+            const summary = results.summary;
+            const piPeriod = results.pi_period;
+            
+            summarySection.innerHTML = `
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <h4><i class="fas fa-calendar-alt"></i> PI Duration</h4>
+                        <h2>${piPeriod.duration_days} days</h2>
+                        <small>${piPeriod.start_date} to ${piPeriod.end_date}</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <h4><i class="fas fa-project-diagram"></i> Projects</h4>
+                        <h2>${summary.total_projects}</h2>
+                        <small>Related to Base Project</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <h4><i class="fas fa-tasks"></i> Completed Issues</h4>
+                        <h2>${summary.total_issues}</h2>
+                        <small>Closed during PI</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <h4><i class="fas fa-clock"></i> Total Estimates</h4>
+                        <h2>${summary.total_estimate_hours.toFixed(1)}h</h2>
+                        <small>${summary.unestimated_percentage.toFixed(1)}% unestimated</small>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayTypeBreakdown(typeMetrics) {
+            const typeCards = document.getElementById('typeCards');
+            typeCards.innerHTML = '';
+            
+            Object.entries(typeMetrics).forEach(([type, metrics]) => {
+                const card = document.createElement('div');
+                card.className = 'col-md-4';
+                card.innerHTML = `
+                    <div class="type-card">
+                        <h5><i class="fas fa-tag"></i> ${type}</h5>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>${metrics.count}</strong><br>
+                                <small>Issues</small>
+                            </div>
+                            <div class="col-6">
+                                <strong>${metrics.total_estimate_hours.toFixed(1)}h</strong><br>
+                                <small>Estimates</small>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small>
+                                ${metrics.estimated_count} estimated, 
+                                ${metrics.unestimated_count} unestimated 
+                                (${metrics.unestimated_percentage.toFixed(1)}%)
+                            </small>
+                        </div>
+                    </div>
+                `;
+                typeCards.appendChild(card);
+            });
+        }
+
+        function displayProjectBreakdown(projectMetrics) {
+            const projectCards = document.getElementById('projectCards');
+            projectCards.innerHTML = '';
+            
+            Object.entries(projectMetrics).forEach(([project, metrics]) => {
+                const card = document.createElement('div');
+                card.className = 'col-md-4';
+                card.innerHTML = `
+                    <div class="project-card">
+                        <h5><i class="fas fa-folder"></i> ${project}</h5>
+                        <div class="row">
+                            <div class="col-6">
+                                <strong>${metrics.count}</strong><br>
+                                <small>Issues</small>
+                            </div>
+                            <div class="col-6">
+                                <strong>${metrics.total_estimate_hours.toFixed(1)}h</strong><br>
+                                <small>Estimates</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                projectCards.appendChild(card);
+            });
+        }
+        
+        function displayFlowMetrics(flowMetrics) {
+            const flowSection = document.getElementById('flowMetricsSection');
+            const flowCards = document.getElementById('flowMetricsCards');
+            flowCards.innerHTML = '';
+            
+            Object.entries(flowMetrics).forEach(([project, metrics]) => {
+                const card = document.createElement('div');
+                card.className = 'col-md-6';
+                card.innerHTML = `
+                    <div class="flow-card">
+                        <h5><i class="fas fa-chart-line"></i> ${project} Flow Metrics</h5>
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="mb-2">
+                                    <strong>${metrics.work_in_progress}</strong><br>
+                                    <small>Work in Progress</small>
+                                </div>
+                                <div class="mb-2">
+                                    <strong>${metrics.throughput_per_week}</strong><br>
+                                    <small>Items/Week</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="mb-2">
+                                    <strong>${metrics.avg_work_item_age_days}d</strong><br>
+                                    <small>Avg Work Item Age</small>
+                                </div>
+                                <div class="mb-2">
+                                    <strong>${metrics.avg_cycle_time_days}d</strong><br>
+                                    <small>Avg Cycle Time</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-2">
+                            <small>
+                                ${metrics.total_completed} completed, ${metrics.total_issues} total issues
+                            </small>
+                        </div>
+                    </div>
+                `;
+                flowCards.appendChild(card);
+            });
+            
+            flowSection.style.display = 'block';
+        }
+        
+        function displayCoachingRecommendations(coachingSummary) {
+            const coachingSection = document.getElementById('coachingSection');
+            const coachingOverview = document.getElementById('coachingOverview');
+            const coachingCards = document.getElementById('coachingCards');
+            const generalRecommendations = document.getElementById('generalRecommendations');
+            
+            // Display overall health
+            const healthClass = `health-${coachingSummary.overall_health.toLowerCase()}`;
+            coachingOverview.innerHTML = `
+                <div class="text-center">
+                    <span class="health-badge ${healthClass}">
+                        <i class="fas fa-heartbeat"></i> Overall Flow Health: ${coachingSummary.overall_health}
+                    </span>
+                    <p class="mt-2">
+                        ${coachingSummary.total_recommendations} recommendations 
+                        (${coachingSummary.critical_issues} critical, ${coachingSummary.warning_issues} warnings)
+                    </p>
+                </div>
+            `;
+            
+            // Display specific recommendations
+            coachingCards.innerHTML = '';
+            coachingSummary.all_recommendations.forEach(rec => {
+                const card = document.createElement('div');
+                card.className = 'col-md-6';
+                const severityClass = `coaching-${rec.severity.toLowerCase()}`;
+                const icon = rec.severity === 'Critical' ? 'fas fa-exclamation-triangle' : 'fas fa-exclamation-circle';
+                
+                card.innerHTML = `
+                    <div class="coaching-card ${severityClass}">
+                        <h6><i class="${icon}"></i> ${rec.project} - ${rec.metric}</h6>
+                        <p><strong>Current:</strong> ${rec.current_value} | <strong>Threshold:</strong> ${rec.threshold}</p>
+                        <p><em>${rec.advice}</em></p>
+                    </div>
+                `;
+                coachingCards.appendChild(card);
+            });
+            
+            // Display general recommendations
+            if (coachingSummary.general_recommendations && coachingSummary.general_recommendations.length > 0) {
+                generalRecommendations.innerHTML = `
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-compass"></i> General Agile Flow Principles</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                ${coachingSummary.general_recommendations.map(rec => 
+                                    `<li><i class="fas fa-check-circle text-success"></i> ${rec}</li>`
+                                ).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            coachingSection.style.display = 'block';
+        }
+
+        function showMessage(message, type) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = `<div class="${type}">${message}</div>`;
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    messagesDiv.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        // Download PDF report
+        document.getElementById('downloadReport').addEventListener('click', function() {
+            if (!analysisResults) {
+                showMessage('No analysis results available', 'error');
+                return;
+            }
+
+            fetch('/generate_pi_report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(analysisResults)
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('PDF generation failed');
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `pi_analysis_${new Date().toISOString().slice(0,10)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                showMessage('PDF report downloaded successfully!', 'success');
+            })
+            .catch(error => {
+                showMessage(`PDF generation error: ${error.message}`, 'error');
+            });
+        });
+    </script>
+</body>
+</html>

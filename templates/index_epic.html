@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Obeya Epic Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --start-color: #c1d7c5ff;
+            --mid-color: #47bc89b7;
+            --end-color: #1b9f669c;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--start-color) 0%, var(--mid-color) 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .spinner-container {
+            text-align: center;
+        }
+
+        .spinner-text {
+            margin-top: 1rem;
+            color: var(--mid-color);
+            font-weight: bold;
+        }
+
+        .chart-container {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .error-section {
+            display: none;
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 5px solid var(--start-color);
+            background-color: #fff3f5;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+
+        .error-title {
+            color: var(--start-color);
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .error-details {
+            color: var(--end-color);
+            font-size: 0.9rem;
+        }
+
+        .error-suggestion {
+            margin-top: 10px;
+            color: #666;
+            font-style: italic;
+        }
+
+        .epic-card {
+            margin: 20px 0;
+            border: none;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .epic-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .progress {
+            height: 20px;
+            border-radius: 10px;
+            background-color: #e9ecef;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, var(--start-color) 0%, var(--mid-color) 100%);
+        }
+
+        .btn-primary {
+            background-color: var(--mid-color);
+            border-color: var(--mid-color);
+        }
+
+        .btn-primary:hover {
+            background-color: #004d7a;
+            border-color: #004d7a;
+        }
+
+        .btn-success {
+            background-color: var(--start-color);
+            border-color: var(--start-color);
+        }
+
+        .btn-success:hover {
+            background-color: #cc0033;
+            border-color: #cc0033;
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-container">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <div class="spinner-text">Processing Epic Analysis...</div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="container">
+            <h1 class="display-4">
+                <i class="fas fa-project-diagram me-2"></i>
+                Obeya Epic Analysis
+            </h1>
+            <p class="lead">Track and analyze epics across your projects</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Error Section -->
+        <div class="error-section" id="errorSection">
+            <div class="error-title">
+                <i class="fas fa-exclamation-circle me-2"></i>
+                <span id="errorType">Error Type</span>
+            </div>
+            <div class="error-details" id="errorMessage">Error details will appear here</div>
+            <div class="error-suggestion" id="errorSuggestion">Suggestion will appear here</div>
+        </div>
+        
+        <!-- Input Form -->
+        <div class="card mb-4">
+            <div class="card-body">
+                <form id="analysisForm" autocomplete="off">
+                    <div class="mb-3">
+                        <label for="jira_url" class="form-label">
+                            <i class="fas fa-link me-2"></i>Jira URL
+                        </label>
+                        <input type="url" class="form-control" id="jira_url" name="jira_url" 
+                               required spellcheck="false">
+                    </div>
+                    <div class="mb-3">
+                        <label for="access_token" class="form-label">
+                            <i class="fas fa-key me-2"></i>Access Token (PAT)
+                        </label>
+                        <input type="password" class="form-control" id="access_token" name="access_token" 
+                               required autocomplete="new-password" spellcheck="false">
+                    </div>
+                    <div class="mb-3">
+                        <label for="jql_query" class="form-label">
+                            <i class="fas fa-search me-2"></i>JQL Query
+                        </label>
+                        <textarea class="form-control" id="jql_query" name="jql_query" rows="3" required>project in ("CFI Backlog", "CCM Clearing & Lifecycle", "CCM - Card Issuance & Domestic Debit", "MFS - Issuing APIs Area Backlog", "MFS - Issuing GUIs Area Backlog", "MFS WLPFO Issuing (Market Facing Services  - Issuing Front Office)", "VAS Satellites", "VAS Reporting") AND type = Epic AND status not in (Closed, Done, Cancelled, Resolved, Abandonned)</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-primary" id="analyzeButton">
+                        <i class="fas fa-chart-bar me-2"></i>Analyze Epics
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" style="display: none;">
+            <div class="row mb-4">
+                <div class="col-md-9">
+                    <div class="card">
+                        <div class="card-body">
+                            <h4 class="card-title"><i class="fas fa-chart-pie me-2"></i>Analysis Summary</h4>
+                            <div class="row" id="analysisSummary">
+                                <!-- Will be populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <button id="exportPdf" class="btn btn-success w-100 mb-2">
+                        <i class="fas fa-file-pdf me-2"></i>Export to PDF
+                    </button>
+                    <button id="exportCsv" class="btn btn-warning w-100 mb-2">
+                        <i class="fas fa-file-csv me-2"></i>Export Estimates CSV
+                    </button>
+                    <button id="updateEstimates" class="btn btn-info w-100">
+                        <i class="fas fa-sync-alt me-2"></i>Update Estimates
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Charts -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <h3><i class="fas fa-chart-pie me-2"></i>Epic Size Distribution</h3>
+                        <img id="epicPieChart" class="img-fluid" alt="Epic Size Distribution">
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="chart-container">
+                        <h3><i class="fas fa-chart-line me-2"></i>Epic Estimate Comparison</h3>
+                        <p class="text-muted small">Compares original vs remaining estimates for each epic</p>
+                        <img id="estimateChart" class="img-fluid" alt="Epic Progress Chart">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Epic Details -->
+            <div class="epic-details">
+                <h3><i class="fas fa-tasks me-2"></i>Epic Details</h3>
+                <div class="row mb-2 text-muted small">
+                    <div class="col-md-4"><strong>Epic</strong></div>
+                    <div class="col-md-2 text-center"><strong>Status</strong></div>
+                    <div class="col-md-2 text-center"><strong>Orig/Rem Hours</strong></div>
+                    <div class="col-md-2 text-center"><strong>Progress</strong></div>
+                    <div class="col-md-2 text-center"><strong>Children</strong></div>
+                </div>
+                <div id="epicList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const errorSection = document.getElementById('errorSection');
+        const resultsSection = document.getElementById('resultsSection');
+
+        function showLoading() {
+            loadingOverlay.style.display = 'flex';
+        }
+
+        function hideLoading() {
+            loadingOverlay.style.display = 'none';
+        }
+
+        function showError(error) {
+            errorSection.style.display = 'block';
+            document.getElementById('errorType').textContent = error.error_type || 'Error';
+            document.getElementById('errorMessage').textContent = error.error || 'An unknown error occurred';
+            document.getElementById('errorSuggestion').textContent = error.error_details?.suggestion || 'Please try again';
+            resultsSection.style.display = 'none';
+        }
+
+        function hideError() {
+            errorSection.style.display = 'none';
+        }
+
+        document.getElementById('analysisForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+            hideError();
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/analyze_epics', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayResults(data);
+                } else {
+                    showError(data);
+                }
+            } catch (error) {
+                showError({
+                    error_type: 'Network Error',
+                    error: error.message,
+                    error_details: {
+                        suggestion: 'Please check your internet connection and try again'
+                    }
+                });
+            } finally {
+                hideLoading();
+            }
+        });
+
+        function displayResults(data) {
+            // Update charts
+            if (data.visualizations.estimate_charts && data.visualizations.estimate_charts.length > 0) {
+                // Show only the first chart in the main view
+                document.getElementById('estimateChart').src = `data:image/png;base64,${data.visualizations.estimate_charts[0]}`;
+            }
+            if (data.visualizations.epic_pie_chart) {
+                document.getElementById('epicPieChart').src = `data:image/png;base64,${data.visualizations.epic_pie_chart}`;
+            }
+            
+            // Calculate summary statistics
+            const totalEpics = data.epic_analysis.length;
+            const completedEpics = data.epic_analysis.filter(epic => epic.progress === 100).length;
+            const unestimatedEpics = data.epic_analysis.filter(epic => 
+                epic.original_estimate === 0 && epic.remaining_estimate === 0 && epic.num_children === 0
+            ).length;
+            const totalEstimatedHours = data.epic_analysis.reduce((sum, epic) => sum + epic.original_estimate, 0);
+            const remainingHours = data.epic_analysis.reduce((sum, epic) => sum + epic.remaining_estimate, 0);
+
+            // Update summary
+            document.getElementById('analysisSummary').innerHTML = `
+                <div class="col-md-2 col-sm-6 mb-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">${totalEpics}</h3>
+                            <small class="text-muted">Total Epics</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 col-sm-6 mb-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">${completedEpics}</h3>
+                            <small class="text-muted">Completed</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 col-sm-6 mb-3">
+                    <div class="card bg-warning">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">${unestimatedEpics}</h3>
+                            <small class="text-dark">Unestimated</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">${totalEstimatedHours.toFixed(0)}</h3>
+                            <small class="text-muted">Total Hours</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-sm-6 mb-3">
+                    <div class="card bg-light">
+                        <div class="card-body text-center">
+                            <h3 class="mb-0">${remainingHours.toFixed(0)}</h3>
+                            <small class="text-muted">Remaining Hours</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Update epic list with pagination
+            const epicList = document.getElementById('epicList');
+            epicList.innerHTML = '';
+            
+            // Filter epics with estimates or children
+            const filteredEpics = data.epic_analysis.filter(epic => 
+                epic.original_estimate > 0 || 
+                epic.remaining_estimate > 0 || 
+                epic.num_children > 0
+            );
+            
+            // Pagination setup
+            const epicsPerPage = 10;
+            let currentPage = 1;
+            const totalPages = Math.ceil(filteredEpics.length / epicsPerPage);
+            
+            function displayEpics(page) {
+                const startIndex = (page - 1) * epicsPerPage;
+                const endIndex = startIndex + epicsPerPage;
+                const epicsToShow = filteredEpics.slice(startIndex, endIndex);
+                
+                epicList.innerHTML = '';
+                
+                epicsToShow.forEach(epic => {
+                const progress = Math.round(epic.progress);
+                const epicCard = document.createElement('div');
+                epicCard.className = 'card mb-2';
+                epicCard.innerHTML = `
+                    <div class="card-body py-2">
+                        <div class="row align-items-center">
+                            <div class="col-md-4">
+                                <h6 class="mb-1"><a href="${document.getElementById('jira_url').value}browse/${epic.key}" target="_blank">${epic.key}</a></h6>
+                                <small class="text-muted">${epic.summary.substring(0, 50)}${epic.summary.length > 50 ? '...' : ''}</small>
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <span class="badge bg-secondary">${epic.status}</span>
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <small>${epic.original_estimate.toFixed(0)}h / ${epic.remaining_estimate.toFixed(0)}h</small>
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <div class="progress" style="height: 15px;">
+                                    <div class="progress-bar${progress === 100 ? ' bg-success' : ''}" 
+                                        style="width: ${progress}%;" title="${progress}% complete">
+                                    </div>
+                                </div>
+                                <small>${progress}%</small>
+                            </div>
+                            <div class="col-md-2 text-center">
+                                <small><i class="fas fa-code-branch"></i> ${epic.num_children}</small>
+                            </div>
+                        </div>
+                        ${epic.children.length > 0 ? `
+                        <div class="mt-2">
+                            <details>
+                                <summary class="text-primary" style="cursor: pointer;">View ${epic.children.length} child issues</summary>
+                                <div class="table-responsive mt-2">
+                                    <table class="table table-sm">
+                                        <thead>
+                                            <tr>
+                                                <th>Key</th>
+                                                <th>Summary</th>
+                                                <th>Status</th>
+                                                <th>Est.</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            ${epic.children.map(child => `
+                                                <tr>
+                                                    <td><a href="${document.getElementById('jira_url').value}/browse/${child.key}" target="_blank">${child.key}</a></td>
+                                                    <td>${child.summary.substring(0, 40)}${child.summary.length > 40 ? '...' : ''}</td>
+                                                    <td><span class="badge bg-secondary">${child.status}</span></td>
+                                                    <td>${child.original_estimate.toFixed(0)}h</td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </details>
+                        </div>
+                        ` : ''}
+                    </div>
+                `;
+                    epicList.appendChild(epicCard);
+                });
+                
+                // Add pagination controls
+                if (totalPages > 1) {
+                    const paginationDiv = document.createElement('div');
+                    paginationDiv.className = 'mt-3 d-flex justify-content-center';
+                    paginationDiv.innerHTML = `
+                        <nav>
+                            <ul class="pagination">
+                                <li class="page-item ${currentPage === 1 ? 'disabled' : ''}">
+                                    <button class="page-link" onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+                                </li>
+                                ${Array.from({length: totalPages}, (_, i) => i + 1).map(pageNum => `
+                                    <li class="page-item ${pageNum === currentPage ? 'active' : ''}">
+                                        <button class="page-link" onclick="changePage(${pageNum})">${pageNum}</button>
+                                    </li>
+                                `).join('')}
+                                <li class="page-item ${currentPage === totalPages ? 'disabled' : ''}">
+                                    <button class="page-link" onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Next</button>
+                                </li>
+                            </ul>
+                        </nav>
+                        <div class="ms-3 align-self-center">
+                            <small class="text-muted">Showing ${startIndex + 1}-${Math.min(endIndex, filteredEpics.length)} of ${filteredEpics.length} epics</small>
+                        </div>
+                    `;
+                    epicList.appendChild(paginationDiv);
+                }
+            }
+            
+            // Global function for pagination
+            window.changePage = function(page) {
+                if (page >= 1 && page <= totalPages) {
+                    currentPage = page;
+                    displayEpics(currentPage);
+                }
+            };
+            
+            // Display first page
+            displayEpics(1);
+            
+            // Store data for PDF export
+            window.analysisData = data;
+            
+            resultsSection.style.display = 'block';
+        }
+
+        document.getElementById('exportPdf').addEventListener('click', async () => {
+            if (!window.analysisData) {
+                showError({
+                    error_type: 'Export Error',
+                    error: 'No analysis data available',
+                    error_details: {
+                        suggestion: 'Please run the analysis first before exporting'
+                    }
+                });
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/export_pdf', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        ...window.analysisData,
+                        jira_url: document.getElementById('jira_url').value
+                    })
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `epic_analysis_${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const error = await response.json();
+                    showError(error);
+                }
+            } catch (error) {
+                showError({
+                    error_type: 'Export Error',
+                    error: error.message,
+                    error_details: {
+                        suggestion: 'Please try exporting again'
+                    }
+                });
+            } finally {
+                hideLoading();
+            }
+        });
+
+        document.getElementById('exportCsv').addEventListener('click', async () => {
+            if (!window.analysisData) {
+                showError({
+                    error_type: 'Export Error',
+                    error: 'No analysis data available',
+                    error_details: {
+                        suggestion: 'Please run the analysis first before exporting'
+                    }
+                });
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/export_csv', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(window.analysisData)
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `epic_estimates_${new Date().toISOString().slice(0,19).replace(/[:-]/g, '')}.csv`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    const error = await response.json();
+                    showError(error);
+                }
+            } catch (error) {
+                showError({
+                    error_type: 'Export Error',
+                    error: error.message,
+                    error_details: {
+                        suggestion: 'Please try exporting again'
+                    }
+                });
+            } finally {
+                hideLoading();
+            }
+        });
+
+        document.getElementById('updateEstimates').addEventListener('click', async () => {
+            if (!window.analysisData) {
+                showError({
+                    error_type: 'Update Error',
+                    error: 'No analysis data available',
+                    error_details: {
+                        suggestion: 'Please run the analysis first before updating estimates'
+                    }
+                });
+                return;
+            }
+            
+            if (!confirm('This will update epic estimates in Jira. Are you sure?')) {
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('/update_estimates', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        ...window.analysisData,
+                        jira_url: document.getElementById('jira_url').value,
+                        access_token: document.getElementById('access_token').value
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Successfully updated ${result.updated_count} epic estimates!`);
+                } else {
+                    showError(result);
+                }
+            } catch (error) {
+                showError({
+                    error_type: 'Update Error',
+                    error: error.message,
+                    error_details: {
+                        suggestion: 'Please try updating again'
+                    }
+                });
+            } finally {
+                hideLoading();
+            }
+        });
+    </script>
+</body>
+</html>

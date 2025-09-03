@@ -48,9 +48,14 @@
     <div class="container-fluid">
         <div class="row">
             <div class="col-md-12">
-                <header class="bg-primary text-white p-4 mb-4">
-                    <h1><i class="fas fa-chart-line"></i> Jira Analytics Dashboard</h1>
-                    <p class="mb-0">Analyze your team's agile metrics and lead times</p>
+                <header class="bg-primary text-white py-2 px-4 mb-4">
+                    <div class="d-flex align-items-center">
+                        <img src="{{ url_for('static', filename='logo.png') }}" alt="Jira Lead Time Analyzer" style="height: 110px; margin-right: 20px;">
+                        <div>
+                            <h1><i class="fas fa-chart-line"></i> Jira Analytics Dashboard</h1>
+                            <p class="mb-0">Analyze your team's agile metrics and lead times</p>
+                        </div>
+                    </div>
                 </header>
 
                 <!-- Input Form -->
@@ -361,38 +366,7 @@
             });
         });
 
-        // CSV Upload Form Handler
-document.getElementById('csvUploadForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-    
-    const formData = new FormData(this);
-    
-    // Show loading
-    document.getElementById('loading').style.display = 'block';
-    document.getElementById('results').style.display = 'none';
-    document.getElementById('messages').innerHTML = '';
-    
-    fetch('/analyze_csv', {
-        method: 'POST',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-        document.getElementById('loading').style.display = 'none';
-        
-        if (data.success) {
-            analysisResults = data;
-            displayResults(data);
-            showMessage(`Analysis completed! Processed ${data.total_issues} issues from CSV.`, 'success');
-        } else {
-            showMessage(`Error: ${data.error}`, 'error');
-        }
-    })
-    .catch(error => {
-        document.getElementById('loading').style.display = 'none';
-        showMessage(`Network error: ${error.message}`, 'error');
-    });
-});
+
 
 // CSV Upload Form Handler
 document.addEventListener('DOMContentLoaded', function() {

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira Analytics Suite - Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" type="image/x-icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <style>
+        .hero-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 4rem 0;
+        }
+        .app-card {
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: none;
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        .app-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .app-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        .feature-icon {
+            font-size: 2rem;
+            color: #667eea;
+        }
+        .stats-card {
+            background: linear-gradient(45deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border-radius: 15px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">
+                <i class="fas fa-chart-line me-2"></i>
+                Jira Analytics Suite
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/presentation">
+                            <i class="fas fa-presentation me-1"></i>
+                            Generate Presentation
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero-section">
+        <div class="container text-center">
+            <h1 class="display-4 fw-bold mb-4">
+                <i class="fas fa-rocket me-3"></i>
+                Jira Analytics Suite
+            </h1>
+            <p class="lead mb-4">
+                Comprehensive analytics tools for Agile teams - Flow metrics, PI analysis, Sprint forecasting, and Epic management
+            </p>
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="stats-card p-4">
+                        <div class="row text-center">
+                            <div class="col-3">
+                                <h3 class="fw-bold">4</h3>
+                                <small>Analytics Tools</small>
+                            </div>
+                            <div class="col-3">
+                                <h3 class="fw-bold">∞</h3>
+                                <small>Jira Projects</small>
+                            </div>
+                            <div class="col-3">
+                                <h3 class="fw-bold">PDF</h3>
+                                <small>Reports</small>
+                            </div>
+                            <div class="col-3">
+                                <h3 class="fw-bold">Real-time</h3>
+                                <small>Analysis</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Applications Section -->
+    <section class="py-5">
+        <div class="container">
+            <div class="row text-center mb-5">
+                <div class="col-12">
+                    <h2 class="display-5 fw-bold mb-3">Choose Your Analytics Tool</h2>
+                    <p class="lead text-muted">Select the application that best fits your analysis needs</p>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <!-- Lead Time Analyzer -->
+                <div class="col-lg-6 col-md-6">
+                    <div class="card app-card h-100 shadow">
+                        <div class="card-body text-center p-4">
+                            <div class="app-icon text-primary">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                            <h4 class="card-title fw-bold">Lead Time Analyzer</h4>
+                            <p class="card-text text-muted mb-4">
+                                Analyze flow metrics, cycle times, and lead times for continuous improvement insights.
+                            </p>
+                            <ul class="list-unstyled text-start mb-4">
+                                <li><i class="fas fa-check text-success me-2"></i>Flow metrics analysis</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Cycle time tracking</li>
+                                <li><i class="fas fa-check text-success me-2"></i>CSV import support</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Professional PDF reports</li>
+                            </ul>
+                            <a href="/lead-time" class="btn btn-primary btn-lg w-100">
+                                <i class="fas fa-play me-2"></i>Launch Analyzer
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- PI Analyzer -->
+                <div class="col-lg-6 col-md-6">
+                    <div class="card app-card h-100 shadow">
+                        <div class="card-body text-center p-4">
+                            <div class="app-icon text-info">
+                                <i class="fas fa-project-diagram"></i>
+                            </div>
+                            <h4 class="card-title fw-bold">PI Analyzer</h4>
+                            <p class="card-text text-muted mb-4">
+                                Analyze Product Increment completion metrics and cross-project dependencies.
+                            </p>
+                            <ul class="list-unstyled text-start mb-4">
+                                <li><i class="fas fa-check text-success me-2"></i>PI completion analysis</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Cross-project tracking</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Automatic discovery</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Flow metrics integration</li>
+                            </ul>
+                            <a href="/pi-analyzer" class="btn btn-info btn-lg w-100">
+                                <i class="fas fa-play me-2"></i>Launch Analyzer
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sprint Analyzer -->
+                <div class="col-lg-6 col-md-6">
+                    <div class="card app-card h-100 shadow">
+                        <div class="card-body text-center p-4">
+                            <div class="app-icon text-warning">
+                                <i class="fas fa-running"></i>
+                            </div>
+                            <h4 class="card-title fw-bold">Sprint Analyzer</h4>
+                            <p class="card-text text-muted mb-4">
+                                Forecast sprint completion probability using historical velocity data.
+                            </p>
+                            <ul class="list-unstyled text-start mb-4">
+                                <li><i class="fas fa-check text-success me-2"></i>Sprint forecasting</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Historical velocity analysis</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Risk assessment</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Monte Carlo simulation</li>
+                            </ul>
+                            <a href="/sprint-analyzer" class="btn btn-warning btn-lg w-100">
+                                <i class="fas fa-play me-2"></i>Launch Analyzer
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Epic Analyzer -->
+                <div class="col-lg-6 col-md-6">
+                    <div class="card app-card h-100 shadow">
+                        <div class="card-body text-center p-4">
+                            <div class="app-icon text-success">
+                                <i class="fas fa-tasks"></i>
+                            </div>
+                            <h4 class="card-title fw-bold">Epic Analyzer</h4>
+                            <p class="card-text text-muted mb-4">
+                                Manage Epic estimates and synchronize with child issues for better planning.
+                            </p>
+                            <ul class="list-unstyled text-start mb-4">
+                                <li><i class="fas fa-check text-success me-2"></i>Epic-child comparison</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Estimate validation</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Progress tracking</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Direct API updates</li>
+                            </ul>
+                            <a href="/epic-analyzer" class="btn btn-success btn-lg w-100">
+                                <i class="fas fa-play me-2"></i>Launch Analyzer
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="py-5 bg-light">
+        <div class="container">
+            <div class="row text-center mb-5">
+                <div class="col-12">
+                    <h2 class="display-6 fw-bold mb-3">Why Choose Our Analytics Suite?</h2>
+                    <p class="lead text-muted">Built for Agile teams who need data-driven insights</p>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-lg-4 col-md-6">
+                    <div class="text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-bolt"></i>
+                        </div>
+                        <h5 class="fw-bold">Real-time Analysis</h5>
+                        <p class="text-muted">Connect directly to your Jira instance for up-to-date metrics and insights.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-shield-alt"></i>
+                        </div>
+                        <h5 class="fw-bold">Secure & Safe</h5>
+                        <p class="text-muted">Enterprise-grade security with rate limiting and input validation.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-file-pdf"></i>
+                        </div>
+                        <h5 class="fw-bold">Professional Reports</h5>
+                        <p class="text-muted">Generate beautiful PDF reports for stakeholders and management.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-chart-bar"></i>
+                        </div>
+                        <h5 class="fw-bold">Rich Visualizations</h5>
+                        <p class="text-muted">Interactive charts and graphs to understand your data better.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-cogs"></i>
+                        </div>
+                        <h5 class="fw-bold">Configurable</h5>
+                        <p class="text-muted">Customize analysis parameters to fit your team's specific needs.</p>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="text-center">
+                        <div class="feature-icon mb-3">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h5 class="fw-bold">Team Focused</h5>
+                        <p class="text-muted">Built by agile coaches for agile teams and their unique challenges.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-dark text-white py-4">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>Jira Analytics Suite</h5>
+                    <p class="text-muted">Empowering Agile teams with data-driven insights.</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p class="text-muted">
+                        <i class="fas fa-user me-1"></i>
+                        Developed by Pietro Maffi | 
+                        <i class="fas fa-calendar me-1"></i>
+                        2025
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

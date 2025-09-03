@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sprint Analyzer - Jira Analytics</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        .status-card {
+            border-left: 4px solid #007bff;
+            margin-bottom: 10px;
+        }
+        .risk-low { border-color: #28a745; }
+        .risk-medium { border-color: #ffc107; }
+        .risk-high { border-color: #dc3545; }
+        .recommendation-item {
+            background: #f8f9fa;
+            border-left: 4px solid #17a2b8;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border-radius: 0 5px 5px 0;
+        }
+        .progress-ring {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto;
+        }
+        .progress-ring circle {
+            fill: transparent;
+            stroke-width: 8;
+            stroke-linecap: round;
+        }
+        .progress-ring .background {
+            stroke: #e9ecef;
+        }
+        .progress-ring .progress {
+            stroke: #28a745;
+            stroke-dasharray: 0 251.2;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+            transition: stroke-dasharray 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <header class="bg-primary text-white p-4 mb-4">
+                    <h1><i class="fas fa-rocket"></i> Sprint Analyzer</h1>
+                    <p class="mb-0">Analyze sprint capacity and forecast feasibility with historical data 
+                        <i class="fas fa-info-circle" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#infoModal" title="Click for more information"></i>
+                    </p>
+                </header>
+
+                <!-- Input Form -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3><i class="fas fa-cog"></i> Sprint Analysis Configuration</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="sprintAnalysisForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="jira_url" class="form-label">Jira Server URL</label>
+                                        <input type="url" class="form-control" id="jira_url" name="jira_url" 
+                                               placeholder="https://your-jira-server.com" required>
+                                        <div class="form-text">Enter your Jira server URL</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="access_token" class="form-label">Access Token</label>
+                                        <input type="password" class="form-control" id="access_token" name="access_token" 
+                                               placeholder="Your API token" required>
+                                        <div class="form-text">API token for authentication</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label for="sprint_name" class="form-label">Sprint Name or ID</label>
+                                        <input type="text" class="form-control" id="sprint_name" name="sprint_name" 
+                                               placeholder="Development Sprint 15" required>
+                                        <div class="form-text">Enter the exact sprint name or ID from Jira</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="history_months" class="form-label">Historical Data Period</label>
+                                        <select class="form-select" id="history_months" name="history_months">
+                                            <option value="1" selected>Last 1 Month</option>
+                                            <option value="2">Last 2 Months</option>
+                                            <option value="3">Last 3 Months</option>
+                                            <option value="6">Last 6 Months</option>
+                                            <option value="12">Last Year</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Sprint Capacity Configuration -->
+                            <div class="row">
+                                <div class="col-md-2">
+                                    <div class="mb-3">
+                                        <label for="team_size" class="form-label">Team Size</label>
+                                        <input type="number" class="form-control" id="team_size" name="team_size" 
+                                               value="8" min="1" max="999" style="max-width: 80px;" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="mb-3">
+                                        <label for="sprint_days" class="form-label">Sprint Days</label>
+                                        <input type="number" class="form-control" id="sprint_days" name="sprint_days" 
+                                               value="10" min="1" max="999" style="max-width: 80px;" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="mb-3">
+                                        <label for="hours_per_day" class="form-label">Hours/Day</label>
+                                        <input type="number" class="form-control" id="hours_per_day" name="hours_per_day" 
+                                               value="8" min="1" max="999" style="max-width: 80px;" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="completion_statuses" class="form-label">Completion Statuses</label>
+                                        <input type="text" class="form-control" id="completion_statuses" name="completion_statuses" 
+                                               value="Done,Closed" required>
+                                        <div class="form-text">Comma-separated status names</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <div class="alert alert-info mb-0 h-100 d-flex align-items-center">
+                                            <strong>Sprint Capacity:<br/> <span id="capacityDisplay">640</span> hours</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-chart-line"></i> Analyze Sprint
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loading" class="loading">
+                    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <h4 class="mt-3">🔍 Analyzing Sprint Data...</h4>
+                    <p class="text-muted">Fetching issues, calculating metrics, and generating forecast...</p>
+                </div>
+
+                <!-- Results Section -->
+                <div id="results" style="display: none;">
+                    <!-- Sprint Header -->
+                    <div id="sprintHeader" class="alert alert-info">
+                        <h4><i class="fas fa-flag"></i> <span id="sprintNameDisplay"></span></h4>
+                        <p class="mb-0">Analysis completed on <span id="analysisDate"></span></p>
+                    </div>
+
+                    <!-- Main Metrics -->
+                    <div class="row mb-4">
+                        <div class="col-md-3">
+                            <div class="card metric-card text-center">
+                                <h3 id="totalIssues">0</h3>
+                                <p class="mb-0">Total Issues</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card metric-card text-center">
+                                <h3><span id="estimatedHours">0</span>h</h3>
+                                <p class="mb-0">Estimated Hours</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card metric-card text-center">
+                                <h3><span id="remainingHours">0</span>h</h3>
+                                <p class="mb-0">Remaining Hours</p>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card metric-card text-center">
+                                <h3><span id="completionProbability">0</span>%</h3>
+                                <p class="mb-0">Completion Probability</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Progress and Risk -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-chart-pie"></i> Sprint Progress</h5>
+                                </div>
+                                <div class="card-body text-center">
+                                    <svg class="progress-ring">
+                                        <circle class="background" cx="60" cy="60" r="40"></circle>
+                                        <circle class="progress" cx="60" cy="60" r="40" id="progressCircle"></circle>
+                                    </svg>
+                                    <div id="progressDisplay">
+                                        <h4 class="mt-3"><span id="progressPercentage">0</span>% Complete</h4>
+                                        <p class="text-muted"><span id="timeSpent">0</span>h spent of <span id="totalEstimated">0</span>h estimated</p>
+                                    </div>
+                                    <div id="overtimeDisplay" class="alert alert-danger" style="display: none;">
+                                        <h4 class="mt-3">100% Complete</h4>
+                                        <p class="mb-0"><strong>Spent time is higher than planned</strong></p>
+                                        <p class="text-muted"><span id="overtimeSpent">0</span>h spent of <span id="overtimeEstimated">0</span>h estimated</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h5><i class="fas fa-exclamation-triangle"></i> Risk Assessment</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="alert" id="riskAlert">
+                                        <h4><i class="fas fa-flag" id="riskIcon"></i> <span id="riskLevel">UNKNOWN</span> Risk</h4>
+                                        <p class="mb-2">Remaining workload: <strong><span id="remainingDays">0</span> days</strong> (<span id="remainingHoursRisk">0</span>h)</p>
+                                        <p class="mb-2">Estimated time needed: <strong><span id="daysNeeded">0</span> days</strong> (<span id="weeksNeeded">0</span> weeks)</p>
+                                        <p class="mb-0">Based on historical velocity and current workload</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Status Breakdown -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-tasks"></i> Status Breakdown</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="statusBreakdown" class="row">
+                                <!-- Status cards will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Historical Context -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-history"></i> Historical Context & Monte Carlo Analysis</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row mb-3">
+                                <div class="col-md-3 text-center">
+                                    <h4><span id="avgVelocity">0</span> stories/week</h4>
+                                    <p class="text-muted">Average Velocity</p>
+                                </div>
+                                <div class="col-md-3 text-center">
+                                    <h4><span id="estimateAccuracy">0</span>x</h4>
+                                    <p class="text-muted">Estimate Accuracy</p>
+                                </div>
+                                <div class="col-md-3 text-center">
+                                    <h4><span id="completionRate">0</span>%</h4>
+                                    <p class="text-muted">Historical Completion Rate</p>
+                                </div>
+                                <div class="col-md-3 text-center">
+                                    <h4><span id="historicalIssues">0</span></h4>
+                                    <p class="text-muted">Historical Issues Analyzed</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Monte Carlo Velocity Distribution -->
+                            <div id="monteCarloSection" style="display: none;">
+                                <hr>
+                                <h6><i class="fas fa-dice"></i> Monte Carlo Velocity Distribution</h6>
+                                <div class="row">
+                                    <div class="col-md-4 text-center">
+                                        <div class="badge badge-success p-2">
+                                            <strong>P90 (Optimistic)</strong><br>
+                                            <span id="p90Velocity">0</span> stories/week
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 text-center">
+                                        <div class="badge badge-warning p-2">
+                                            <strong>P50 (Realistic)</strong><br>
+                                            <span id="p50Velocity">0</span> stories/week
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 text-center">
+                                        <div class="badge badge-danger p-2">
+                                            <strong>P10 (Pessimistic)</strong><br>
+                                            <span id="p10Velocity">0</span> stories/week
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Monte Carlo Scenarios -->
+                    <div id="scenarioAnalysis" class="card mb-4" style="display: none;">
+                        <div class="card-header">
+                            <h5><i class="fas fa-chart-line"></i> Scenario Analysis & Risk Mitigation</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="alert alert-info">
+                                <strong>Remaining Stories:</strong> <span id="remainingStoriesCount">0</span> stories need to be completed
+                            </div>
+                            
+                            <div class="row" id="scenarioCards">
+                                <!-- Scenario cards will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recommendations -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-lightbulb"></i> Recommendations</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="recommendations">
+                                <!-- Recommendations will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Export Options -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h5><i class="fas fa-download"></i> Export Report</h5>
+                        </div>
+                        <div class="card-body">
+                            <button type="button" class="btn btn-primary" id="exportPdfBtn">
+                                <i class="fas fa-file-pdf"></i> Export as PDF
+                            </button>
+                            <p class="text-muted mt-2">Generate a comprehensive PDF report including detailed analysis data and technical information.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Messages -->
+                <div id="messages"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Info Modal -->
+    <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="infoModalLabel"><i class="fas fa-info-circle"></i> Sprint Analyzer Features</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ol>
+                        <li><strong>Clear Risk Visualization:</strong> See exactly how many stories are at risk at different confidence levels</li>
+                        <li><strong>Actionable Recommendations:</strong> Know precisely which stories to remove for different risk tolerances</li>
+                        <li><strong>Monte Carlo Forecasting:</strong> Use statistical analysis to predict sprint outcomes</li>
+                        <li><strong>Historical Context:</strong> Leverage past sprint data to improve future planning</li> 
+                    </ol>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Got it!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Update capacity display when inputs change
+        function updateCapacityDisplay() {
+            const teamSize = parseInt(document.getElementById('team_size').value) || 8;
+            const sprintDays = parseInt(document.getElementById('sprint_days').value) || 10;
+            const hoursPerDay = parseInt(document.getElementById('hours_per_day').value) || 8;
+            const totalCapacity = teamSize * sprintDays * hoursPerDay;
+            
+            document.getElementById('capacityDisplay').textContent = totalCapacity;
+        }
+        
+        // Add event listeners for capacity inputs
+        document.getElementById('team_size').addEventListener('input', updateCapacityDisplay);
+        document.getElementById('sprint_days').addEventListener('input', updateCapacityDisplay);
+        document.getElementById('hours_per_day').addEventListener('input', updateCapacityDisplay);
+        
+        // Initialize capacity display
+        updateCapacityDisplay();
+        document.getElementById('sprintAnalysisForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('messages').innerHTML = '';
+            
+            // Get form data
+            const formData = new FormData(this);
+            
+            // Submit analysis request
+            fetch('/analyze_sprint', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    currentAnalysisData = data; // Store for PDF export
+                    displayResults(data);
+                } else {
+                    showError(data.error || 'Analysis failed');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showError('Network error: ' + error.message);
+            });
+        });
+
+        function displayResults(data) {
+            const results = data.results;
+            
+            // Update sprint header
+            document.getElementById('sprintNameDisplay').textContent = data.sprint_name;
+            document.getElementById('analysisDate').textContent = data.analysis_date;
+            
+            // Update main metrics
+            document.getElementById('totalIssues').textContent = results.main_metrics.total_issues;
+            document.getElementById('estimatedHours').textContent = results.main_metrics.total_estimated_hours;
+            document.getElementById('remainingHours').textContent = results.main_metrics.remaining_hours;
+            document.getElementById('completionProbability').textContent = results.main_metrics.completion_probability;
+            
+            // Update progress with overtime handling
+            const progress = results.main_metrics.overall_progress;
+            const timeSpent = results.main_metrics.time_spent_hours;
+            const totalEstimated = results.main_metrics.total_estimated_hours;
+            
+            // Check if spent time exceeds estimated time
+            if (timeSpent > totalEstimated && totalEstimated > 0) {
+                // Show overtime display
+                document.getElementById('progressDisplay').style.display = 'none';
+                document.getElementById('overtimeDisplay').style.display = 'block';
+                document.getElementById('overtimeSpent').textContent = timeSpent;
+                document.getElementById('overtimeEstimated').textContent = totalEstimated;
+                
+                // Set progress ring to 100% with red color
+                const circumference = 2 * Math.PI * 40;
+                document.getElementById('progressCircle').style.strokeDasharray = `${circumference} ${circumference}`;
+                document.getElementById('progressCircle').style.strokeDashoffset = 0;
+                document.getElementById('progressCircle').style.stroke = '#dc3545'; // Red color
+            } else {
+                // Show normal progress display
+                document.getElementById('progressDisplay').style.display = 'block';
+                document.getElementById('overtimeDisplay').style.display = 'none';
+                document.getElementById('progressPercentage').textContent = progress;
+                document.getElementById('timeSpent').textContent = timeSpent;
+                document.getElementById('totalEstimated').textContent = totalEstimated;
+                
+                // Update progress ring with normal color
+                const circumference = 2 * Math.PI * 40;
+                const progressOffset = circumference - (progress / 100) * circumference;
+                document.getElementById('progressCircle').style.strokeDasharray = `${circumference} ${circumference}`;
+                document.getElementById('progressCircle').style.strokeDashoffset = progressOffset;
+                document.getElementById('progressCircle').style.stroke = '#28a745'; // Green color
+            }
+            
+            // Update risk assessment
+            const riskLevel = results.main_metrics.risk_level;
+            const riskAlert = document.getElementById('riskAlert');
+            riskAlert.className = `alert alert-${results.risk_color}`;
+            document.getElementById('riskLevel').textContent = riskLevel;
+            document.getElementById('remainingDays').textContent = results.forecast_details.remaining_days;
+            document.getElementById('remainingHoursRisk').textContent = results.main_metrics.remaining_hours;
+            document.getElementById('daysNeeded').textContent = results.forecast_details.estimated_days_needed;
+            document.getElementById('weeksNeeded').textContent = results.forecast_details.estimated_weeks_needed;
+            
+            // Update status breakdown
+            const statusContainer = document.getElementById('statusBreakdown');
+            statusContainer.innerHTML = '';
+            results.status_breakdown.forEach(status => {
+                const statusCard = `
+                    <div class="col-md-6 col-lg-3 mb-3">
+                        <div class="card status-card">
+                            <div class="card-body">
+                                <h6 class="card-title">${status.status}</h6>
+                                <p class="card-text">
+                                    <strong>${status.count}</strong> issues<br>
+                                    <strong>${status.remaining_hours}h</strong> remaining<br>
+                                    <strong>${status.time_spent}h</strong> spent
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                statusContainer.innerHTML += statusCard;
+            });
+            
+            // Update historical context
+            document.getElementById('avgVelocity').textContent = results.historical_context.average_velocity;
+            document.getElementById('estimateAccuracy').textContent = results.historical_context.estimate_accuracy;
+            document.getElementById('completionRate').textContent = results.historical_context.completion_rate;
+            document.getElementById('historicalIssues').textContent = results.historical_context.total_historical_issues;
+            
+            // Update Monte Carlo section if available
+            if (results.historical_context.monte_carlo_enabled && results.historical_context.velocity_percentiles) {
+                const percentiles = results.historical_context.velocity_percentiles;
+                document.getElementById('p90Velocity').textContent = Math.round(percentiles.p90 || 0);
+                document.getElementById('p50Velocity').textContent = Math.round(percentiles.p50 || 0);
+                document.getElementById('p10Velocity').textContent = Math.round(percentiles.p10 || 0);
+                document.getElementById('monteCarloSection').style.display = 'block';
+                
+                // Update scenario analysis
+                if (results.forecast_details.monte_carlo_scenarios) {
+                    updateScenarioAnalysis(results.forecast_details.monte_carlo_scenarios, results.forecast_details.remaining_stories);
+                }
+            }
+            
+            // Update recommendations
+            const recommendationsContainer = document.getElementById('recommendations');
+            recommendationsContainer.innerHTML = '';
+            results.forecast_details.recommendations.forEach(rec => {
+                const recItem = `<div class="recommendation-item">${rec}</div>`;
+                recommendationsContainer.innerHTML += recItem;
+            });
+            
+            // Add unestimated issues warning if any
+            if (results.unestimated_issues > 0) {
+                const warning = `<div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i> 
+                    <strong>${results.unestimated_issues}</strong> issues lack time estimates
+                </div>`;
+                document.getElementById('messages').innerHTML = warning;
+            }
+            
+            // Show results
+            document.getElementById('results').style.display = 'block';
+        }
+
+        function updateScenarioAnalysis(scenarios, remainingStories) {
+            document.getElementById('remainingStoriesCount').textContent = remainingStories;
+            
+            const scenarioContainer = document.getElementById('scenarioCards');
+            scenarioContainer.innerHTML = '';
+            
+            const scenarioOrder = ['p90', 'p50', 'p10'];
+            const scenarioColors = {'p90': 'success', 'p50': 'warning', 'p10': 'danger'};
+            const scenarioTitles = {'p90': 'Optimistic (90%)', 'p50': 'Realistic (50%)', 'p10': 'Conservative (10%)'};
+            
+            scenarioOrder.forEach(key => {
+                if (scenarios[key]) {
+                    const scenario = scenarios[key];
+                    const cardHtml = `
+                        <div class="col-md-4 mb-3">
+                            <div class="card border-${scenarioColors[key]}">
+                                <div class="card-header bg-${scenarioColors[key]} text-white">
+                                    <h6 class="mb-0">${scenarioTitles[key]} Confidence</h6>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Velocity:</strong> ${Math.round(scenario.velocity)} stories/week</p>
+                                    <p><strong>Stories at Risk:</strong> ${scenario.stories_at_risk}</p>
+                                    <p class="text-muted small">${scenario.description}</p>
+                                    <div class="alert alert-${scenarioColors[key]} alert-sm">
+                                        <small><strong>Recommendation:</strong> ${scenario.recommendation}</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    scenarioContainer.innerHTML += cardHtml;
+                }
+            });
+            
+            document.getElementById('scenarioAnalysis').style.display = 'block';
+        }
+        
+        let currentAnalysisData = null;
+        
+        function showError(message) {
+            const errorHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="fas fa-exclamation-circle"></i> <strong>Error:</strong> ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            document.getElementById('messages').innerHTML = errorHtml;
+        }
+        
+        // PDF Export functionality
+        document.getElementById('exportPdfBtn').addEventListener('click', function() {
+            if (!currentAnalysisData) {
+                showError('No analysis data available for export. Please run an analysis first.');
+                return;
+            }
+            
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+            
+            fetch('/export_pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(currentAnalysisData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('PDF export failed');
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `sprint_analysis_${currentAnalysisData.sprint_name.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                // Reset button
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-file-pdf"></i> Export as PDF';
+            })
+            .catch(error => {
+                showError('Failed to export PDF: ' + error.message);
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-file-pdf"></i> Export as PDF';
+            });
+        });
+    </script>
+</body>
+</html>
