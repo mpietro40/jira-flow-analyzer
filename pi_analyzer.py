@@ -75,10 +75,54 @@ class PIAnalyzer:
         self.issue_types = config.get("issue_types", ["Bug", "Story", "Sub-task", "Sub-Feature", "Feature"])
         self.flow_recommendations = config.get("flow_metrics_recommendations", {})
         
-        logger.info(f"🎯 Base project: {self.base_project}")
-        logger.info(f"🚫 Excluded projects: {list(self.excluded_projects)}")
+        # Display detailed configuration
+        self._display_configuration()
+    
+    def _display_configuration(self):
+        """
+        Display detailed configuration information in console.
+        """
+        logger.info("\n" + "="*60)
+        logger.info("📊 PI ANALYZER CONFIGURATION")
+        logger.info("="*60)
+        
+        # Base project configuration
+        logger.info(f"🎯 BASE PROJECT TO SCAN:")
+        logger.info(f"   • {self.base_project}")
+        
+        # Excluded projects
+        logger.info(f"\n🚫 EXCLUDED PROJECTS:")
+        if self.excluded_projects:
+            for project in sorted(self.excluded_projects):
+                logger.info(f"   • {project}")
+        else:
+            logger.info("   • None")
+        
+        # Completion statuses
+        logger.info(f"\n✅ COMPLETION STATUSES FOR SCANNING:")
+        for status in self.completion_statuses:
+            logger.info(f"   • {status}")
+        
+        # In-progress statuses (for flow metrics)
+        logger.info(f"\n🔄 IN-PROGRESS STATUSES (Flow Metrics):")
+        for status in self.in_progress_statuses:
+            logger.info(f"   • {status}")
+        
+        # Issue types
+        logger.info(f"\n📝 ISSUE TYPES TO ANALYZE:")
+        for issue_type in self.issue_types:
+            logger.info(f"   • {issue_type}")
+        
+        # Test mode
         if self.test_mode.get("enabled", False):
-            logger.info(f"🧪 Test mode enabled: {self.test_mode.get('test_initiative_id')}")
+            logger.info(f"\n🧪 TEST MODE ENABLED:")
+            logger.info(f"   • Test Initiative: {self.test_mode.get('test_initiative_id')}")
+            logger.info(f"   • Only this initiative will be analyzed")
+        else:
+            logger.info(f"\n🌐 PRODUCTION MODE:")
+            logger.info(f"   • All Business Initiatives from {self.base_project} will be analyzed")
+        
+        logger.info("="*60 + "\n")
     
     def analyze_pi(self, pi_start_date: str, pi_end_date: str, include_full_backlog: bool = False) -> Dict:
         """
@@ -92,7 +136,15 @@ class PIAnalyzer:
         Returns:
             Dict: Complete PI analysis results
         """
-        logger.info(f"📊 Starting PI analysis from {pi_start_date} to {pi_end_date}")
+        # Display analysis scope
+        logger.info("\n" + "="*60)
+        logger.info("🚀 STARTING PI ANALYSIS")
+        logger.info("="*60)
+        logger.info(f"📅 PI Period: {pi_start_date} to {pi_end_date}")
+        logger.info(f"🎯 Target Project: {self.base_project}")
+        logger.info(f"🔍 Analysis Type: {'Full Backlog + Flow Metrics' if include_full_backlog else 'Completion Metrics Only'}")
+        logger.info(f"🚫 Excluded Projects: {', '.join(sorted(self.excluded_projects)) if self.excluded_projects else 'None'}")
+        logger.info("="*60 + "\n")
         
         # Step 1: Discover related projects
         related_projects = self._discover_related_projects()
@@ -126,7 +178,10 @@ class PIAnalyzer:
         Returns:
             Set[str]: Set of related project keys
         """
-        logger.info(f"🔍 PI analysis focuses on {self.base_project} initiatives")
+        logger.info(f"🔍 PROJECT DISCOVERY:")
+        logger.info(f"   • Primary focus: {self.base_project} Business Initiatives")
+        logger.info(f"   • Child projects will be discovered automatically")
+        logger.info(f"   • Projects to exclude: {', '.join(sorted(self.excluded_projects)) if self.excluded_projects else 'None'}")
         return {self.base_project}
     
     def _get_isdop_initiatives(self) -> List[Dict]:
