@@ -1,0 +1,36 @@
+{
+  "timeout_settings": {
+    "connect_timeout": 30,
+    "read_timeout": 180,
+    "batch_size": 50,
+    "min_batch_size": 10
+  },
+  "performance_profiles": {
+    "fast_server": {
+      "connect_timeout": 15,
+      "read_timeout": 60,
+      "batch_size": 200,
+      "min_batch_size": 50
+    },
+    "slow_server": {
+      "connect_timeout": 30,
+      "read_timeout": 180,
+      "batch_size": 50,
+      "min_batch_size": 10
+    },
+    "very_slow_server": {
+      "connect_timeout": 45,
+      "read_timeout": 300,
+      "batch_size": 25,
+      "min_batch_size": 5
+    }
+  },
+  "instructions": {
+    "description": "Adjust timeout settings based on your Jira server performance",
+    "connect_timeout": "Time to wait for initial connection (seconds)",
+    "read_timeout": "Time to wait for server response (seconds)",
+    "batch_size": "Number of issues to fetch per request",
+    "min_batch_size": "Minimum batch size when reducing due to timeouts",
+    "profiles": "Use predefined profiles by copying values to timeout_settings"
+  }
+}

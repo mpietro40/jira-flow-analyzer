@@ -4,11 +4,21 @@ Handles connection and data retrieval from Jira servers.
 """
 
 import requests
+import requests.adapters
 import logging
 from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import json
 import time
+
+# Import urllib3 with fallback
+try:
+    from urllib3.util.retry import Retry
+except ImportError:
+    try:
+        from requests.packages.urllib3.util.retry import Retry
+    except ImportError:
+        Retry = None
 
 # Configure logger with proper name
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(filename)s:%(lineno)d - %(message)s')
@@ -41,9 +51,37 @@ class JiraClient:
         })
         
         # Connection settings for production
-        self.timeout = (10, 30)  # (connect, read) timeouts
+        self.timeout = (15, 60)  # (connect, read) timeouts - increased for large queries
         self.max_retries = 3
-        self.retry_delay = 1  # seconds
+        self.retry_delay = 2  # seconds
+        self.batch_size = 200  # Default batch size
+        self.min_batch_size = 50  # Minimum batch size when reducing due to timeouts
+        
+        # Configure session for better performance
+        if Retry:
+            self.session.mount('https://', requests.adapters.HTTPAdapter(
+                max_retries=Retry(
+                    total=0,  # We handle retries manually
+                    backoff_factor=0.3,
+                    status_forcelist=[500, 502, 503, 504]
+                )
+            ))
+    
+    def configure_timeouts(self, connect_timeout: int = 15, read_timeout: int = 60, 
+                          batch_size: int = 200, min_batch_size: int = 50):
+        """
+        Configure timeout and batch size settings.
+        
+        Args:
+            connect_timeout (int): Connection timeout in seconds
+            read_timeout (int): Read timeout in seconds
+            batch_size (int): Default batch size for queries
+            min_batch_size (int): Minimum batch size when reducing due to timeouts
+        """
+        self.timeout = (connect_timeout, read_timeout)
+        self.batch_size = batch_size
+        self.min_batch_size = min_batch_size
+        logger.info(f"🔧 Updated timeouts: connect={connect_timeout}s, read={read_timeout}s, batch={batch_size}")
     
     def test_connection(self) -> bool:
         """
@@ -117,7 +155,7 @@ class JiraClient:
     ## fetching is done in chunks of 200 to avoid hitting API limits.
     def fetch_issues(self, jql_query: str, max_results: int = 5000, start_at: int = 0) -> List[Dict]:
         """
-        Fetch issues from Jira using JQL query.
+        Fetch issues from Jira using JQL query with adaptive timeout handling.
         
         Args:
             jql_query (str): JQL query string
@@ -128,26 +166,78 @@ class JiraClient:
         """
         issues = []
         current_start = start_at
+        current_batch_size = self.batch_size
+        consecutive_timeouts = 0
+        
         logger.info(f"🔍 Fetching issues with JQL: {jql_query}")
         
         while True:
-            try:
-                # Prepare request parameters
-                params = {
-                    'jql': jql_query,
-                    'startAt': current_start,
-                    'maxResults': min(200, max_results - len(issues)),
-                    'expand': 'changelog',
-                    'fields': 'key,summary,status,created,resolutiondate,assignee,priority,issuetype,timeoriginalestimate,timeestimate'
-                }
+            # Retry logic for each batch with adaptive strategies
+            batch_success = False
+            timeout_occurred = False
+            
+            for attempt in range(self.max_retries):
+                try:
+                    # Prepare request parameters with current batch size
+                    params = {
+                        'jql': jql_query,
+                        'startAt': current_start,
+                        'maxResults': min(current_batch_size, max_results - len(issues)),
+                        'expand': 'changelog',
+                        'fields': 'key,summary,status,created,resolutiondate,assignee,priority,issuetype,timeoriginalestimate,timeestimate'
+                    }
+                    
+                    logger.info(f"🔄 Fetching batch starting at {current_start} (size: {params['maxResults']}, attempt {attempt + 1}/{self.max_retries})")
+                    
+                    # Use longer timeout for retries
+                    current_timeout = (self.timeout[0], self.timeout[1] * (attempt + 1))
+                    
+                    response = self.session.get(
+                        f'{self.base_url}/rest/api/2/search',
+                        params=params,
+                        timeout=current_timeout
+                    )
+                    response.raise_for_status()
+                    batch_success = True
+                    consecutive_timeouts = 0  # Reset timeout counter on success
+                    break
+                    
+                except requests.exceptions.Timeout as e:
+                    timeout_occurred = True
+                    logger.warning(f"⏰ Timeout on attempt {attempt + 1}/{self.max_retries} for batch at {current_start} (timeout: {current_timeout[1]}s): {str(e)}")
+                    if attempt < self.max_retries - 1:
+                        # Exponential backoff with jitter
+                        delay = self.retry_delay * (2 ** attempt) + (attempt * 0.5)
+                        logger.info(f"⏳ Waiting {delay:.1f}s before retry...")
+                        time.sleep(delay)
+                except requests.exceptions.RequestException as e:
+                    logger.warning(f"⚠️ Request failed on attempt {attempt + 1}/{self.max_retries} for batch at {current_start}: {str(e)}")
+                    if attempt < self.max_retries - 1:
+                        time.sleep(self.retry_delay * (attempt + 1))
+            
+            # Handle batch failure with adaptive strategies
+            if not batch_success:
+                if timeout_occurred:
+                    consecutive_timeouts += 1
+                    
+                    # Try reducing batch size if we have consecutive timeouts
+                    if consecutive_timeouts >= 2 and current_batch_size > self.min_batch_size:
+                        old_size = current_batch_size
+                        current_batch_size = max(self.min_batch_size, current_batch_size // 2)
+                        logger.info(f"🔧 Reducing batch size from {old_size} to {current_batch_size} due to timeouts")
+                        consecutive_timeouts = 0  # Reset counter after adjustment
+                        continue  # Try again with smaller batch
+                    
+                    # If still failing with minimum batch size, try skipping this batch
+                    if current_batch_size == self.min_batch_size:
+                        logger.warning(f"⏭️ Skipping batch at {current_start} due to persistent timeouts")
+                        current_start += self.min_batch_size
+                        continue
                 
-                response = self.session.get(
-                    f'{self.base_url}/rest/api/2/search',
-                    params=params,
-                    timeout=self.timeout
-                )
-                response.raise_for_status()
-                
+                logger.error(f"🚩 Failed to fetch batch after {self.max_retries} attempts, stopping at {current_start}")
+                break
+            
+            if batch_success:
                 data = response.json()
                 batch_issues = data.get('issues', [])
                 
@@ -162,16 +252,65 @@ class JiraClient:
                 
                 current_start += len(batch_issues)
                 
+                # Gradually increase batch size back to normal if we had reduced it
+                if current_batch_size < self.batch_size and consecutive_timeouts == 0:
+                    current_batch_size = min(self.batch_size, current_batch_size + 25)
+                    if current_batch_size < self.batch_size:
+                        logger.info(f"📈 Increasing batch size to {current_batch_size}")
+                
+                # Log progress
+                total_available = data.get('total', 0)
+                logger.info(f"📊 Progress: {len(issues)}/{min(max_results, total_available)} issues fetched (batch: {len(batch_issues)} issues)")
+                
                 # Check if we've fetched all available issues
                 if current_start >= data.get('total', 0) or len(issues) >= max_results:
                     break
-                    
-            except requests.exceptions.RequestException as e:
-                logger.error(f"🚩 API request failed: {str(e)}")
-                raise Exception(f"Failed to fetch issues: {str(e)}")
         
-        logger.info(f"✅ Fetched {len(issues)} issues from Jira")
+        # Final summary
+        if issues:
+            logger.info(f"✅ Successfully fetched {len(issues)} issues from Jira")
+        else:
+            logger.warning(f"⚠️ No issues fetched - check JQL query and permissions")
+        
         return issues
+    
+    def handle_timeout_recovery(self, jql_query: str, failed_start: int, max_results: int) -> List[Dict]:
+        """
+        Attempt to recover from timeout by using simpler queries.
+        
+        Args:
+            jql_query (str): Original JQL query
+            failed_start (int): Position where timeout occurred
+            max_results (int): Maximum results to fetch
+            
+        Returns:
+            List[Dict]: Recovered issues if any
+        """
+        logger.info(f"🔧 Attempting timeout recovery from position {failed_start}")
+        
+        # Try with minimal fields first
+        simple_params = {
+            'jql': jql_query,
+            'startAt': failed_start,
+            'maxResults': self.min_batch_size,
+            'fields': 'key,summary,status'  # Minimal fields
+        }
+        
+        try:
+            response = self.session.get(
+                f'{self.base_url}/rest/api/2/search',
+                params=simple_params,
+                timeout=(self.timeout[0], 30)  # Shorter timeout
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            logger.info(f"✅ Recovery successful - fetched {len(data.get('issues', []))} issues with minimal fields")
+            return data.get('issues', [])
+            
+        except Exception as e:
+            logger.error(f"🚩 Recovery attempt failed: {str(e)}")
+            return []
     
     def _process_issue(self, issue: Dict) -> Optional[Dict]:
         """
@@ -459,3 +598,27 @@ class JiraClient:
                 break
         
         return issues
+    
+    def get_issue_comments(self, issue_key: str) -> List[Dict]:
+        """
+        Get all comments for a specific issue.
+        
+        Args:
+            issue_key (str): The issue key to get comments for
+            
+        Returns:
+            List[Dict]: List of comment dictionaries
+        """
+        try:
+            response = self.session.get(
+                f'{self.base_url}/rest/api/2/issue/{issue_key}/comment',
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+            
+            data = response.json()
+            return data.get('comments', [])
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to get comments for {issue_key}: {str(e)}")
+            return []
