@@ -47,6 +47,7 @@ def analyze_sprint():
         sprint_days = int(request.form.get('sprint_days', 10))
         hours_per_day = int(request.form.get('hours_per_day', 8))
         completion_statuses = request.form.get('completion_statuses', 'Done,Closed').strip()
+        excluded_types = request.form.get('excluded_types', 'Epic').strip()
         
         # Validate inputs
         if not all([jira_url, access_token, sprint_name]):
@@ -67,6 +68,7 @@ def analyze_sprint():
         analyzer = SprintAnalyzer(jira_client)
         analyzer.configure_capacity(team_size, sprint_days, hours_per_day)
         analyzer.configure_completion_statuses(completion_statuses)
+        analyzer.configure_excluded_types(excluded_types)
         
         # Capture detailed logs for PDF export
         detailed_logs = {}
@@ -88,18 +90,24 @@ def analyze_sprint():
         else:
             jql_queries.append(f'sprint = "{sprint_name}"')
         
-        # Add historical data JQL query
+        # Add historical data JQL query with actual pattern used
         if 'historical_context' in results:
             historical = results['historical_context']
-            # Simulate historical JQL query
-            jql_queries.append('resolved >= "2024-02-20" AND resolved <= "2024-08-20" AND type NOT IN (Epic, "XTest", "XTest Execution", "XTest Plan") AND status IN (Done,Closed)')
+            pattern_used = historical.get('sprint_pattern_used', '')
+            if pattern_used:
+                jql_queries.append(f'Historical data filtered by sprint pattern: {pattern_used}')
+            else:
+                jql_queries.append('Historical data: All completed issues in date range')
         
         # Add forecast details
         if 'forecast' in results:
             forecast = results['forecast']
+            historical = results.get('historical_context', {})
             detailed_logs['forecast_details'] = {
                 'remaining_stories': forecast.get('remaining_stories', 0),
-                'velocity_used': historical.get('average_velocity', 0) if 'historical_context' in results else 0
+                'velocity_used': historical.get('average_velocity', 0),
+                'similar_sprints_analyzed': historical.get('similar_sprints_count', 0),
+                'sprint_pattern_used': historical.get('sprint_pattern_used', 'None')
             }
         
         # Add weekly velocities from historical context if available
@@ -165,6 +173,7 @@ def format_results_for_web(results: dict) -> dict:
         })
     
     # Format forecast details
+    date_forecast = forecast.get('date_forecast', {})
     forecast_details = {
         'estimated_weeks_needed': round(forecast.get('estimated_weeks_needed', 0), 1),
         'estimated_days_needed': round(forecast.get('estimated_days_needed', 0), 1),
@@ -174,7 +183,15 @@ def format_results_for_web(results: dict) -> dict:
         'risk_level': forecast.get('risk_level', 'UNKNOWN'),
         'recommendations': forecast.get('recommendations', []),
         'monte_carlo_scenarios': forecast.get('monte_carlo_scenarios', {}),
-        'remaining_stories': forecast.get('remaining_stories', 0)
+        'remaining_stories': forecast.get('remaining_stories', 0),
+        'date_forecast': {
+            'planned_end_date': date_forecast.get('planned_end_date'),
+            'estimated_completion_date': date_forecast.get('estimated_completion_date'),
+            'days_difference': date_forecast.get('days_difference', 0),
+            'will_finish_on_time': date_forecast.get('will_finish_on_time', True),
+            'missing_days': date_forecast.get('missing_days', 0),
+            'date_risk_level': date_forecast.get('date_risk_level', 'LOW')
+        }
     }
     
     # Format historical context
@@ -186,7 +203,11 @@ def format_results_for_web(results: dict) -> dict:
         'completion_rate': round(historical.get('completion_rate', 0) * 100, 0),
         'total_historical_issues': historical.get('total_historical_issues', 0),
         'monte_carlo_enabled': bool(monte_carlo_data),
-        'velocity_percentiles': monte_carlo_data.get('percentiles', {})
+        'velocity_percentiles': monte_carlo_data.get('percentiles', {}),
+        'sprint_pattern_used': historical.get('sprint_pattern_used', ''),
+        'similar_sprints_count': historical.get('similar_sprints_count', 0),
+        'velocity_variance': historical.get('velocity_variance', 0),
+        'weekly_story_counts': historical.get('weekly_story_counts', [])
     }
     
     # Get risk level color

@@ -184,7 +184,7 @@ class JiraClient:
                         'startAt': current_start,
                         'maxResults': min(current_batch_size, max_results - len(issues)),
                         'expand': 'changelog',
-                        'fields': 'key,summary,status,created,resolutiondate,assignee,priority,issuetype,timeoriginalestimate,timeestimate'
+                        'fields': 'key,summary,status,created,resolutiondate,assignee,priority,issuetype,timeoriginalestimate,timeestimate,fixVersions,project,customfield_10037,customfield_10095,customfield_10096,customfield_10097,comment'
                     }
                     
                     logger.info(f"🔄 Fetching batch starting at {current_start} (size: {params['maxResults']}, attempt {attempt + 1}/{self.max_retries})")
