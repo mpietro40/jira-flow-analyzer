@@ -105,6 +105,20 @@
                                     </div>
                                 </div>
                             </div>
+                            
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="traverse_hierarchy" name="traverse_hierarchy">
+                                            <label class="form-check-label" for="traverse_hierarchy">
+                                                <strong>Traverse Hierarchy</strong>
+                                            </label>
+                                            <div class="form-text">Use JQL query to find initiatives, then analyze all child issues (Features, Epics, Stories, etc.). Large datasets will be processed with progress tracking.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
 
                             <button type="submit" class="btn btn-primary btn-lg">
@@ -189,6 +203,31 @@
 
                 <!-- Results Section -->
                 <div id="results" style="display: none;">
+                    <!-- Lead Time Metrics Explanation -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4><i class="fas fa-info-circle"></i> Lead Time Metrics Explained</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-calculator"></i> Average Lead Time</h6>
+                                    <p class="small text-muted">The arithmetic mean of all lead times. Useful for capacity planning but can be skewed by outliers.</p>
+                                    
+                                    <h6><i class="fas fa-chart-bar"></i> Median Lead Time</h6>
+                                    <p class="small text-muted">The middle value when all lead times are sorted. More representative of typical performance than average.</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-exclamation-triangle"></i> 85th Percentile</h6>
+                                    <p class="small text-muted">85% of items are completed within this time. Good for setting realistic delivery expectations.</p>
+                                    
+                                    <h6><i class="fas fa-warning"></i> 95th Percentile</h6>
+                                    <p class="small text-muted">95% of items are completed within this time. Helps identify outliers and worst-case scenarios.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
                     <!-- Metrics Summary -->
                     <div id="metricsSection" class="row mb-4">
                         <!-- Metrics will be populated here -->
@@ -221,9 +260,18 @@
             e.preventDefault();
             
             const formData = new FormData(this);
+            const traverseHierarchy = document.getElementById('traverse_hierarchy').checked;
             
-            // Show loading
-            document.getElementById('loading').style.display = 'block';
+            // Show loading with appropriate message
+            const loadingDiv = document.getElementById('loading');
+            const loadingText = loadingDiv.querySelector('p');
+            if (traverseHierarchy) {
+                loadingText.textContent = 'Analyzing hierarchy... This may take several minutes for large datasets.';
+            } else {
+                loadingText.textContent = 'Analyzing your Jira data...';
+            }
+            
+            loadingDiv.style.display = 'block';
             document.getElementById('results').style.display = 'none';
             document.getElementById('messages').innerHTML = '';
             
@@ -238,7 +286,13 @@
                 if (data.success) {
                     analysisResults = data;
                     displayResults(data);
-                    showMessage('Analysis completed successfully!', 'success');
+                    
+                    let successMessage = 'Analysis completed successfully!';
+                    if (data.analysis_type === 'hierarchical') {
+                        const metadata = data.hierarchy_metadata || {};
+                        successMessage += ` Analyzed ${metadata.total_initiatives || 0} initiatives with ${data.total_issues} total issues.`;
+                    }
+                    showMessage(successMessage, 'success');
                 } else {
                     showMessage(`Error: ${data.error}`, 'error');
                 }

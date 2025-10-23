@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Jira Status Changer</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f5f5f5;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .form-group { 
+            margin-bottom: 20px; 
+        }
+        label { 
+            display: block; 
+            margin-bottom: 8px; 
+            font-weight: bold; 
+            color: #555;
+        }
+        input, textarea { 
+            width: 100%; 
+            padding: 12px; 
+            border: 2px solid #ddd; 
+            border-radius: 6px; 
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        input:focus, textarea:focus {
+            border-color: #007cba;
+            outline: none;
+        }
+        textarea {
+            height: 80px;
+            resize: vertical;
+        }
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+        button { 
+            background: #007cba; 
+            color: white; 
+            padding: 15px 30px; 
+            border: none; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+        button:hover { 
+            background: #005a87; 
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .results { 
+            margin-top: 30px; 
+            display: none;
+        }
+        .status-box { 
+            background: #f8f9fa; 
+            border: 2px solid #dee2e6; 
+            padding: 20px; 
+            border-radius: 6px; 
+            margin-bottom: 20px;
+        }
+        .status-processing { 
+            border-color: #ffc107; 
+            background: #fff3cd;
+        }
+        .status-completed { 
+            border-color: #28a745; 
+            background: #d4edda;
+        }
+        .status-error { 
+            border-color: #dc3545; 
+            background: #f8d7da;
+        }
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #007cba;
+            transition: width 0.3s ease;
+        }
+        .results-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .logs-list {
+            max-height: 400px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+        .result-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+            font-family: monospace;
+            font-size: 13px;
+        }
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        .log-item {
+            padding: 4px 0;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+        .error-item {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .success-item {
+            color: #28a745;
+        }
+        .log-tabs {
+            display: flex;
+            margin-top: 20px;
+            border-bottom: 1px solid #ddd;
+        }
+        .log-tab {
+            padding: 10px 20px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            cursor: pointer;
+            margin-right: 2px;
+        }
+        .log-tab.active {
+            background: white;
+            border-bottom: 1px solid white;
+            margin-bottom: -1px;
+        }
+        .log-content {
+            display: none;
+        }
+        .log-content.active {
+            display: block;
+        }
+        .info-box {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .warning-box {
+            background: #fff3e0;
+            border: 1px solid #ff9800;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        .spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #007cba;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔄 Jira Status Changer</h1>
+            <p>Change issue statuses from JQL query: Current Status → Waiting → PROD DEPLOYED</p>
+        </div>
+        
+        <div class="warning-box">
+            <strong>⚠️ Warning:</strong> This tool will change the status of ALL issues matching your JQL query. 
+            Please test with a small subset first by adding appropriate filters to your JQL.
+        </div>
+        
+        <form id="statusForm">
+            <div class="form-group">
+                <label for="baseUrl">Jira Base URL:</label>
+                <input type="text" id="baseUrl" placeholder="https://your-company.atlassian.net" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="token">API Token:</label>
+                <input type="password" id="token" placeholder="Your Jira API token" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="jqlQuery">JQL Query:</label>
+                <textarea id="jqlQuery" placeholder="project = 'PROJECT' AND status = 'Ready for Production'" required></textarea>
+                <small style="color: #666;">Example: project = 'MYPROJECT' AND status = 'Ready for Production' AND fixVersion = '1.2.0'</small>
+            </div>
+            
+            <div class="info-box">
+                <strong>ℹ️ Process:</strong>
+                <ol>
+                    <li>Search for issues matching your JQL query</li>
+                    <li>For each issue: Change status to "Waiting"</li>
+                    <li>Wait 3 seconds</li>
+                    <li>Change status to "PROD DEPLOYED" (or similar)</li>
+                </ol>
+            </div>
+            
+            <div class="button-container">
+                <button type="submit" id="submitBtn">🚀 Start Status Changes</button>
+            </div>
+        </form>
+        
+        <div class="results" id="results">
+            <div class="status-box" id="statusBox">
+                <h3 id="statusTitle">Operation Status</h3>
+                <div id="statusContent"></div>
+                <div class="progress-bar" id="progressBar" style="display: none;">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+            </div>
+            
+            <div class="results-list" id="resultsList" style="display: none;">
+                <!-- Results will be populated here -->
+            </div>
+            
+            <div class="log-tabs" id="logTabs" style="display: none;">
+                <div class="log-tab active" onclick="showLogTab('results')">Results & Errors</div>
+                <div class="log-tab" onclick="showLogTab('logs')">Detailed Logs</div>
+            </div>
+            
+            <div class="log-content active" id="resultsContent">
+                <div class="results-list" id="resultsDisplay" style="display: none;">
+                    <!-- Results will be populated here -->
+                </div>
+            </div>
+            
+            <div class="log-content" id="logsContent">
+                <div class="logs-list" id="logsDisplay" style="display: none;">
+                    <!-- Logs will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentOperationId = null;
+        let statusCheckInterval = null;
+
+        document.getElementById('statusForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const baseUrl = document.getElementById('baseUrl').value.trim();
+            const token = document.getElementById('token').value.trim();
+            const jqlQuery = document.getElementById('jqlQuery').value.trim();
+            
+            if (!baseUrl || !token || !jqlQuery) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            // Disable form and show loading
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').innerHTML = '<span class="spinner"></span>Starting...';
+            document.getElementById('results').style.display = 'block';
+            
+            try {
+                const response = await fetch('/change_statuses', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        base_url: baseUrl,
+                        token: token,
+                        jql_query: jqlQuery
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    currentOperationId = result.operation_id;
+                    startStatusMonitoring();
+                } else {
+                    showError('Error starting operation: ' + (result.error || 'Unknown error'));
+                    resetForm();
+                }
+                
+            } catch (error) {
+                showError('Error: ' + error.message);
+                resetForm();
+            }
+        });
+
+        function startStatusMonitoring() {
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+            }
+            
+            statusCheckInterval = setInterval(checkOperationStatus, 1000);
+            checkOperationStatus(); // Check immediately
+        }
+
+        async function checkOperationStatus() {
+            if (!currentOperationId) return;
+            
+            try {
+                const response = await fetch(`/operation_status/${currentOperationId}`);
+                const status = await response.json();
+                
+                updateStatusDisplay(status);
+                
+                if (status.status === 'completed' || status.status === 'error') {
+                    clearInterval(statusCheckInterval);
+                    resetForm();
+                }
+                
+            } catch (error) {
+                console.error('Error checking status:', error);
+            }
+        }
+
+        function updateStatusDisplay(status) {
+            const statusBox = document.getElementById('statusBox');
+            const statusTitle = document.getElementById('statusTitle');
+            const statusContent = document.getElementById('statusContent');
+            const progressBar = document.getElementById('progressBar');
+            const progressFill = document.getElementById('progressFill');
+            const logTabs = document.getElementById('logTabs');
+            const resultsDisplay = document.getElementById('resultsDisplay');
+            const logsDisplay = document.getElementById('logsDisplay');
+            
+            // Update status box styling
+            statusBox.className = 'status-box';
+            if (status.status === 'processing' || status.status === 'searching_issues') {
+                statusBox.classList.add('status-processing');
+            } else if (status.status === 'completed') {
+                statusBox.classList.add('status-completed');
+            } else if (status.status === 'error') {
+                statusBox.classList.add('status-error');
+            }
+            
+            // Update content based on status
+            let content = '';
+            if (status.status === 'searching_issues') {
+                content = '<span class="spinner"></span>Searching for issues matching JQL query...';
+            } else if (status.status === 'processing') {
+                const progress = status.total_issues > 0 ? (status.processed / status.total_issues) * 100 : 0;
+                content = `<span class="spinner"></span>Processing issues: ${status.processed}/${status.total_issues}`;
+                progressBar.style.display = 'block';
+                progressFill.style.width = progress + '%';
+            } else if (status.status === 'completed') {
+                content = `✅ Operation completed! Processed ${status.processed}/${status.total_issues} issues.`;
+                progressBar.style.display = 'none';
+            } else if (status.status === 'error') {
+                content = '❌ Operation failed.';
+                progressBar.style.display = 'none';
+            }
+            
+            statusContent.innerHTML = content;
+            
+            // Show tabs and content if we have results, errors, or logs
+            if ((status.results && status.results.length > 0) || 
+                (status.errors && status.errors.length > 0) || 
+                (status.logs && status.logs.length > 0)) {
+                
+                logTabs.style.display = 'flex';
+                
+                // Update results and errors
+                let resultsHtml = '';
+                if (status.results && status.results.length > 0) {
+                    resultsHtml += '<h4>✅ Successful Status Changes:</h4>';
+                    status.results.forEach(result => {
+                        resultsHtml += `<div class="result-item success-item">✓ ${result}</div>`;
+                    });
+                }
+                
+                if (status.errors && status.errors.length > 0) {
+                    resultsHtml += '<h4>❌ Errors:</h4>';
+                    status.errors.forEach(error => {
+                        resultsHtml += `<div class="result-item error-item">❌ ${error}</div>`;
+                    });
+                }
+                
+                if (resultsHtml) {
+                    resultsDisplay.innerHTML = resultsHtml;
+                    resultsDisplay.style.display = 'block';
+                }
+                
+                // Update detailed logs
+                if (status.logs && status.logs.length > 0) {
+                    let logsHtml = '<h4>📋 Detailed Operation Logs:</h4>';
+                    status.logs.forEach(log => {
+                        logsHtml += `<div class="log-item">${log}</div>`;
+                    });
+                    logsDisplay.innerHTML = logsHtml;
+                    logsDisplay.style.display = 'block';
+                }
+            }
+        }
+
+        function showLogTab(tabName) {
+            // Update tab styling
+            const tabs = document.querySelectorAll('.log-tab');
+            tabs.forEach(tab => tab.classList.remove('active'));
+            
+            // Update content visibility
+            const contents = document.querySelectorAll('.log-content');
+            contents.forEach(content => content.classList.remove('active'));
+            
+            if (tabName === 'results') {
+                tabs[0].classList.add('active');
+                document.getElementById('resultsContent').classList.add('active');
+            } else if (tabName === 'logs') {
+                tabs[1].classList.add('active');
+                document.getElementById('logsContent').classList.add('active');
+            }
+        }
+
+        function showError(message) {
+            const statusBox = document.getElementById('statusBox');
+            const statusContent = document.getElementById('statusContent');
+            
+            statusBox.className = 'status-box status-error';
+            statusContent.innerHTML = '❌ ' + message;
+            document.getElementById('results').style.display = 'block';
+        }
+
+        function resetForm() {
+            document.getElementById('submitBtn').disabled = false;
+            document.getElementById('submitBtn').innerHTML = '🚀 Start Status Changes';
+            currentOperationId = null;
+        }
+    </script>
+</body>
+</html>

@@ -156,34 +156,114 @@
             <div class="error-suggestion" id="errorSuggestion">Suggestion will appear here</div>
         </div>
         
-        <!-- Input Form -->
-        <div class="card mb-4">
-            <div class="card-body">
-                <form id="analysisForm" autocomplete="off">
-                    <div class="mb-3">
-                        <label for="jira_url" class="form-label">
-                            <i class="fas fa-link me-2"></i>Jira URL
-                        </label>
-                        <input type="url" class="form-control" id="jira_url" name="jira_url" 
-                               required spellcheck="false">
+        <!-- Three Column Layout for Epic Analysis Features -->
+        <div class="row">
+            <!-- Epic Estimation Analysis -->
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5><i class="fas fa-calculator me-2"></i>Epic Estimation Analysis</h5>
                     </div>
-                    <div class="mb-3">
-                        <label for="access_token" class="form-label">
-                            <i class="fas fa-key me-2"></i>Access Token (PAT)
-                        </label>
-                        <input type="password" class="form-control" id="access_token" name="access_token" 
-                               required autocomplete="new-password" spellcheck="false">
+                    <div class="card-body">
+                        <p class="text-muted small">Analyze epic estimates and progress across projects. Examines epics and child issues for estimation insights.</p>
+                        <form id="analysisForm" autocomplete="off">
+                            <div class="mb-2">
+                                <label for="jira_url" class="form-label small">
+                                    <i class="fas fa-link me-1"></i>Jira URL
+                                </label>
+                                <input type="url" class="form-control form-control-sm" id="jira_url" name="jira_url" required spellcheck="false">
+                            </div>
+                            <div class="mb-2">
+                                <label for="access_token" class="form-label small">
+                                    <i class="fas fa-key me-1"></i>Access Token
+                                </label>
+                                <input type="password" class="form-control form-control-sm" id="access_token" name="access_token" required autocomplete="new-password" spellcheck="false">
+                            </div>
+                            <div class="mb-3">
+                                <label for="jql_query" class="form-label small">
+                                    <i class="fas fa-search me-1"></i>Epic JQL Query
+                                </label>
+                                <textarea class="form-control form-control-sm" id="jql_query" name="jql_query" rows="2" required placeholder="project = PROJ AND type = Epic"></textarea>
+                                <div class="form-text small">Finds epics for without estimation</div>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm w-100">
+                                <i class="fas fa-chart-bar me-1"></i>Analyze Estimates
+                            </button>
+                        </form>
                     </div>
-                    <div class="mb-3">
-                        <label for="jql_query" class="form-label">
-                            <i class="fas fa-search me-2"></i>JQL Query
-                        </label>
-                        <textarea class="form-control" id="jql_query" name="jql_query" rows="3" required>project in ("CFI Backlog", "CCM Clearing & Lifecycle", "CCM - Card Issuance & Domestic Debit", "MFS - Issuing APIs Area Backlog", "MFS - Issuing GUIs Area Backlog", "MFS WLPFO Issuing (Market Facing Services  - Issuing Front Office)", "VAS Satellites", "VAS Reporting") AND type = Epic AND status not in (Closed, Done, Cancelled, Resolved, Abandonned)</textarea>
+                </div>
+            </div>
+            
+            <!-- Epic Distribution Analysis -->
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5><i class="fas fa-sitemap me-2"></i>Epic Distribution Analysis</h5>
                     </div>
-                    <button type="submit" class="btn btn-primary" id="analyzeButton">
-                        <i class="fas fa-chart-bar me-2"></i>Analyze Epics
-                    </button>
-                </form>
+                    <div class="card-body">
+                        <p class="text-muted small">Compare epics from first 25 initiatives vs remaining initiatives. Shows distribution across connected projects.</p>
+                        <form id="distributionAnalysisForm" autocomplete="off">
+                            <div class="mb-2">
+                                <label for="dist_jira_url" class="form-label small">
+                                    <i class="fas fa-link me-1"></i>Jira URL
+                                </label>
+                                <input type="url" class="form-control form-control-sm" id="dist_jira_url" name="jira_url" required spellcheck="false">
+                            </div>
+                            <div class="mb-2">
+                                <label for="dist_access_token" class="form-label small">
+                                    <i class="fas fa-key me-1"></i>Access Token
+                                </label>
+                                <input type="password" class="form-control form-control-sm" id="dist_access_token" name="access_token" required autocomplete="new-password" spellcheck="false">
+                            </div>
+                            <div class="mb-3">
+                                <label for="dist_jql_query" class="form-label small">
+                                    <i class="fas fa-search me-1"></i>Initiative JQL Query
+                                </label>
+                                <textarea class="form-control form-control-sm" id="dist_jql_query" name="jql_query" rows="2" required placeholder="project = PROJ AND type = Initiative"></textarea>
+                                <div class="form-text small">Finds initiatives for hierarchy analysis</div>
+                            </div>
+                            <button type="submit" class="btn btn-success btn-sm w-100">
+                                <i class="fas fa-project-diagram me-1"></i>Analyze Distribution
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Epic Status Validation -->
+            <div class="col-md-4">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h5><i class="fas fa-exclamation-triangle me-2"></i>Epic Status Validation</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small">Find epics in To Do/Backlog status that have children in progress. Identifies outdated epic statuses.</p>
+                        <form id="statusValidationForm" autocomplete="off">
+                            <div class="mb-2">
+                                <label for="status_jira_url" class="form-label small">
+                                    <i class="fas fa-link me-1"></i>Jira URL
+                                </label>
+                                <input type="url" class="form-control form-control-sm" id="status_jira_url" name="jira_url" required spellcheck="false">
+                            </div>
+                            <div class="mb-2">
+                                <label for="status_access_token" class="form-label small">
+                                    <i class="fas fa-key me-1"></i>Access Token
+                                </label>
+                                <input type="password" class="form-control form-control-sm" id="status_access_token" name="access_token" required autocomplete="new-password" spellcheck="false">
+                            </div>
+                            <div class="mb-3">
+                                <label for="status_jql_query" class="form-label small">
+                                    <i class="fas fa-search me-1"></i>Epic JQL Query
+                                </label>
+                                <textarea class="form-control form-control-sm" id="status_jql_query" name="jql_query" rows="2" required placeholder="project = PROJ AND type = Epic"></textarea>
+                                <div class="form-text small">Query to find epics for status validation</div>
+                            </div>
+                            <button type="submit" class="btn btn-warning btn-sm w-100">
+                                <i class="fas fa-search me-1"></i>Validate Status
+                            </button>
+                        </form>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -271,6 +351,74 @@
             errorSection.style.display = 'none';
         }
 
+        // Handle epic status validation form
+        document.getElementById('statusValidationForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+            hideError();
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/analyze_epic_status_validation', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayStatusValidationResults(data.analysis_results);
+                } else {
+                    showError(data);
+                }
+            } catch (error) {
+                showError({
+                    error_type: 'Network Error',
+                    error: error.message,
+                    error_details: {
+                        suggestion: 'Please check your internet connection and try again'
+                    }
+                });
+            } finally {
+                hideLoading();
+            }
+        });
+        
+        // Handle epic distribution analysis form
+        document.getElementById('distributionAnalysisForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+            hideError();
+            
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/analyze_epic_distribution', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayDistributionResults(data.analysis_results);
+                } else {
+                    showError(data);
+                }
+            } catch (error) {
+                showError({
+                    error_type: 'Network Error',
+                    error: error.message,
+                    error_details: {
+                        suggestion: 'Please check your internet connection and try again'
+                    }
+                });
+            } finally {
+                hideLoading();
+            }
+        });
+        
         document.getElementById('analysisForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             showLoading();
@@ -496,6 +644,255 @@
             window.analysisData = data;
             
             resultsSection.style.display = 'block';
+        }
+        
+        function displayStatusValidationResults(data) {
+            // Clear previous results
+            resultsSection.style.display = 'none';
+            
+            // Create status validation results section
+            const statusSection = document.createElement('div');
+            statusSection.id = 'statusValidationResults';
+            statusSection.innerHTML = `
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4><i class="fas fa-exclamation-triangle me-2"></i>Epic Status Validation Results</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-md-4">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h3 class="mb-0">${data.total_epics_checked}</h3>
+                                        <small class="text-muted">Epics Checked</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card ${data.outdated_epics_count > 0 ? 'bg-warning' : 'bg-success'} text-white">
+                                    <div class="card-body text-center">
+                                        <h3 class="mb-0">${data.outdated_epics_count}</h3>
+                                        <small>Outdated Epics</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body text-center">
+                                        <h3 class="mb-0">${((data.outdated_epics_count / Math.max(data.total_epics_checked, 1)) * 100).toFixed(1)}%</h3>
+                                        <small>Outdated Rate</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${data.outdated_epics_count === 0 ? `
+                        <div class="alert alert-success" role="alert">
+                            <i class="fas fa-check-circle me-2"></i>
+                            <strong>Great!</strong> All epics have consistent status with their children.
+                        </div>
+                        ` : `
+                        <div class="alert alert-warning" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>Attention!</strong> Found ${data.outdated_epics_count} epics with outdated status that need updating.
+                        </div>
+                        `}
+                    </div>
+                </div>
+                
+                ${data.outdated_epics && data.outdated_epics.length > 0 ? `
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4><i class="fas fa-list me-2"></i>Outdated Epics (${data.outdated_epics.length})</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Epic</th>
+                                        <th>Current Status</th>
+                                        <th>Project</th>
+                                        <th>In-Progress Children</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.outdated_epics.map(epic => `
+                                        <tr>
+                                            <td>
+                                                <strong>${epic.key}</strong><br>
+                                                <small class="text-muted">${epic.summary.substring(0, 50)}${epic.summary.length > 50 ? '...' : ''}</small>
+                                            </td>
+                                            <td><span class="badge bg-secondary">${epic.status}</span></td>
+                                            <td><span class="badge bg-primary">${epic.project}</span></td>
+                                            <td>
+                                                <span class="badge bg-warning">${epic.in_progress_children_count}</span> of ${epic.total_children_count}
+                                                ${epic.in_progress_children.length > 0 ? `
+                                                <details class="mt-1">
+                                                    <summary class="text-primary" style="cursor: pointer; font-size: 0.8em;">View children</summary>
+                                                    <ul class="list-unstyled mt-1 small">
+                                                        ${epic.in_progress_children.map(child => `
+                                                            <li><strong>${child.key}</strong>: ${child.status}</li>
+                                                        `).join('')}
+                                                    </ul>
+                                                </details>
+                                                ` : ''}
+                                            </td>
+                                            <td>
+                                                <a href="${document.getElementById('status_jira_url').value}/browse/${epic.key}" 
+                                                   target="_blank" class="btn btn-sm btn-outline-primary">
+                                                    <i class="fas fa-external-link-alt me-1"></i>Open in Jira
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+            `;
+            
+            // Remove existing status validation results if any
+            const existingStatus = document.getElementById('statusValidationResults');
+            if (existingStatus) {
+                existingStatus.remove();
+            }
+            
+            // Insert after the three-column layout
+            const threeColumnLayout = document.querySelector('.row');
+            threeColumnLayout.parentNode.insertBefore(statusSection, threeColumnLayout.nextSibling);
+        }
+        
+        function displayDistributionResults(data) {
+            // Clear previous results
+            resultsSection.style.display = 'none';
+            
+            // Create distribution results section
+            const distributionSection = document.createElement('div');
+            distributionSection.id = 'distributionResults';
+            distributionSection.innerHTML = `
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4><i class="fas fa-project-diagram me-2"></i>Epic Distribution Analysis Results</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-4">
+                            <div class="col-md-3">
+                                <div class="card bg-light">
+                                    <div class="card-body text-center">
+                                        <h3 class="mb-0">${data.total_initiatives}</h3>
+                                        <small class="text-muted">Total Initiatives</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-info text-white">
+                                    <div class="card-body text-center">
+                                        <h3 class="mb-0">${data.first_25_epics_count}</h3>
+                                        <small>First 25 Epics</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-success text-white">
+                                    <div class="card-body text-center">
+                                        <h3 class="mb-0">${data.remaining_epics_count}</h3>
+                                        <small>Remaining Epics</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="card bg-primary text-white">
+                                    <div class="card-body text-center">
+                                        <h3 class="mb-0">${data.total_epics_count}</h3>
+                                        <small>Total Epics</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row mb-3">
+                            <div class="col-md-12">
+                                <h6>Connected Projects (${data.connected_projects.length}):</h6>
+                                <p class="text-muted">${data.connected_projects.join(', ')}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                ${data.pie_chart ? `
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4><i class="fas fa-chart-pie me-2"></i>Epic Distribution Chart</h4>
+                    </div>
+                    <div class="card-body text-center">
+                        <img src="data:image/png;base64,${data.pie_chart}" class="img-fluid" alt="Epic Distribution Chart">
+                    </div>
+                </div>
+                ` : ''}
+                
+                ${data.project_distribution && data.project_distribution.by_project ? `
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h4><i class="fas fa-project-diagram me-2"></i>Epic Distribution by Project</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-striped">
+                                <thead>
+                                    <tr>
+                                        <th>Project</th>
+                                        <th class="text-center">First 25 Epics</th>
+                                        <th class="text-center">Remaining Epics</th>
+                                        <th class="text-center">Total Epics</th>
+                                        <th class="text-center">Distribution</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${data.project_distribution.by_project.map(project => `
+                                        <tr>
+                                            <td><strong>${project.project}</strong></td>
+                                            <td class="text-center"><span class="badge bg-info">${project.first_25_epics}</span></td>
+                                            <td class="text-center"><span class="badge bg-success">${project.remaining_epics}</span></td>
+                                            <td class="text-center"><span class="badge bg-primary">${project.total_epics}</span></td>
+                                            <td class="text-center">
+                                                <div class="progress" style="height: 20px; width: 100px;">
+                                                    <div class="progress-bar bg-info" style="width: ${(project.first_25_epics / Math.max(project.total_epics, 1)) * 100}%" title="First 25: ${project.first_25_epics}"></div>
+                                                    <div class="progress-bar bg-success" style="width: ${(project.remaining_epics / Math.max(project.total_epics, 1)) * 100}%" title="Remaining: ${project.remaining_epics}"></div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-3">
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Distribution shows epics from first 25 initiatives (blue) vs remaining initiatives (green) per project
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
+            `;
+            
+            // Remove existing distribution results if any
+            const existingDistribution = document.getElementById('distributionResults');
+            if (existingDistribution) {
+                existingDistribution.remove();
+            }
+            
+            // Insert after the three-column layout to use full page width
+            const threeColumnLayout = document.querySelector('.row');
+            threeColumnLayout.parentNode.insertBefore(distributionSection, threeColumnLayout.nextSibling);
+            
+            // Make the distribution section use full width
+            distributionSection.style.width = '100%';
+            distributionSection.style.marginTop = '2rem';
         }
 
         document.getElementById('exportPdf').addEventListener('click', async () => {

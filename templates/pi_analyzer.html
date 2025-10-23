@@ -103,6 +103,23 @@
                     </div>
                 </header>
 
+                <!-- Cached Results Section -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3><i class="fas fa-history"></i> Retrieve Previous Analysis</h3>
+                    </div>
+                    <div class="card-body">
+                        <p><i class="fas fa-save"></i> All analyses are automatically saved to disk and persist across server restarts.</p>
+                        <p>If your connection was lost during analysis, or you want to view previous results, click below:</p>
+                        <button id="loadCachedResults" class="btn btn-info">
+                            <i class="fas fa-folder-open"></i> Load Available Results
+                        </button>
+                        <div id="cachedResultsList" class="mt-3" style="display: none;">
+                            <!-- Cached results will be listed here -->
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Input Form -->
                 <div class="card mb-4">
                     <div class="card-header">
@@ -116,7 +133,7 @@
                                         <label for="jira_url" class="form-label">Jira Server URL</label>
                                         <input type="url" class="form-control" id="jira_url" name="jira_url" 
                                                placeholder="https://your-company.atlassian.net" required>
-                                        <div class="form-text">Enter your Jira server URL</div>
+                                        <div class="form-text">Enter your Jira server URL (e.g., https://your-company.atlassian.net)</div>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
@@ -304,11 +321,15 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         let analysisResults = null;
+        let currentCacheKey = null;
 
         document.getElementById('piAnalysisForm').addEventListener('submit', function(e) {
             e.preventDefault();
             
             const formData = new FormData(this);
+            const startDate = formData.get('pi_start_date');
+            const endDate = formData.get('pi_end_date');
+            currentCacheKey = `${startDate}_${endDate}`;
             
             // Show loading
             document.getElementById('loading').style.display = 'block';
@@ -333,9 +354,70 @@
             })
             .catch(error => {
                 document.getElementById('loading').style.display = 'none';
-                showMessage(`Network error: ${error.message}`, 'error');
+                showMessage(
+                    `Network error: ${error.message}. ` +
+                    `The analysis may still be running on the server and will be saved automatically. ` +
+                    `Wait a moment, then click "Load Available Results" above to retrieve it.`,
+                    'error'
+                );
             });
         });
+
+        // Load cached results
+        document.getElementById('loadCachedResults').addEventListener('click', function() {
+            fetch('/list_cached_results')
+            .then(response => response.json())
+            .then(data => {
+                const cachedList = document.getElementById('cachedResultsList');
+                
+                if (data.cached_results && data.cached_results.length > 0) {
+                    cachedList.innerHTML = '<h5>Available Results:</h5>';
+                    data.cached_results.forEach(cached => {
+                        const timestamp = new Date(cached.timestamp).toLocaleString();
+                        const btn = document.createElement('button');
+                        btn.className = 'btn btn-sm btn-outline-primary m-1';
+                        btn.innerHTML = `
+                            <i class="fas fa-file-alt"></i> 
+                            ${cached.start_date} to ${cached.end_date} 
+                            (${cached.total_issues} issues) - ${timestamp}
+                        `;
+                        btn.onclick = () => loadCachedResult(cached.cache_key);
+                        cachedList.appendChild(btn);
+                    });
+                    cachedList.style.display = 'block';
+                    showMessage(`Found ${data.cached_results.length} cached result(s)`, 'success');
+                } else {
+                    showMessage('No cached results available', 'error');
+                }
+            })
+            .catch(error => {
+                showMessage(`Error loading cached results: ${error.message}`, 'error');
+            });
+        });
+
+        function loadCachedResult(cacheKey) {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('messages').innerHTML = '';
+            
+            fetch(`/get_cached_results/${cacheKey}`)
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    analysisResults = data;
+                    displayResults(data.analysis_results);
+                    const cachedTime = new Date(data.cached_at).toLocaleString();
+                    showMessage(`Loaded cached results from ${cachedTime}`, 'success');
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showMessage(`Error loading result: ${error.message}`, 'error');
+            });
+        }
 
         function displayResults(results) {
             // Display summary metrics
@@ -579,6 +661,8 @@
                 return;
             }
 
+            showMessage('Generating PDF report...', 'success');
+
             fetch('/generate_pi_report', {
                 method: 'POST',
                 headers: {
@@ -605,6 +689,29 @@
             })
             .catch(error => {
                 showMessage(`PDF generation error: ${error.message}`, 'error');
+            });
+        });
+
+        // Auto-load cached results on page load if available
+        window.addEventListener('load', function() {
+            // Check if there are any cached results
+            fetch('/list_cached_results')
+            .then(response => response.json())
+            .then(data => {
+                if (data.cached_results && data.cached_results.length > 0) {
+                    const cachedList = document.getElementById('cachedResultsList');
+                    cachedList.innerHTML = `
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> 
+                            ${data.cached_results.length} previous analysis result(s) available. 
+                            Click "Load Available Results" to view them.
+                        </div>
+                    `;
+                    cachedList.style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.log('No cached results available');
             });
         });
     </script>

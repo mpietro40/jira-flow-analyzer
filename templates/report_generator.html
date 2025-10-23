@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira Report Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .report-container { max-width: 1200px; margin: 0 auto; }
+        .field-checkbox { margin: 0.25rem 0; }
+        .table-container { max-height: 600px; overflow-y: auto; }
+        .loading { display: none; }
+        .report-section { display: none; }
+        .modern-table { box-shadow: 0 0 20px rgba(0,0,0,0.1); }
+        .modern-table thead th { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            font-weight: 600;
+        }
+        .modern-table tbody tr:nth-child(even) { background-color: #f8f9fa; }
+        .modern-table tbody tr:hover { background-color: #e3f2fd; }
+    </style>
+</head>
+<body class="bg-light">
+    <div class="container-fluid py-4">
+        <div class="report-container">
+            <!-- Header -->
+            <div class="text-center mb-4">
+                <h1 class="display-4 text-primary">
+                    <i class="fas fa-chart-bar me-3"></i>Jira Report Generator
+                </h1>
+                <p class="lead text-muted">Create custom reports from your Jira data</p>
+            </div>
+
+            <!-- Configuration Form -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-cog me-2"></i>Report Configuration</h5>
+                </div>
+                <div class="card-body">
+                    <form id="reportForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Jira Server URL</label>
+                                    <input type="url" class="form-control" id="jira_url" required 
+                                           placeholder="https://your-company.atlassian.net">
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Access Token</label>
+                                    <input type="password" class="form-control" id="access_token" required>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    <label class="form-label">Report Title</label>
+                                    <input type="text" class="form-control" id="report_title" 
+                                           value="Jira Report" placeholder="Enter report title">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Report Size</label>
+                                    <input type="number" class="form-control" id="report_size" 
+                                           value="100" min="1" max="1000" placeholder="Max items">
+                                    <div class="form-text">Maximum number of issues to include</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">JQL Query</label>
+                            <textarea class="form-control" id="jql_query" rows="3" required
+                                      placeholder="project = YOUR_PROJECT AND status = Done"></textarea>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Fields to Display</label>
+                            <div class="row" id="fieldsContainer">
+                                <!-- Fields will be loaded dynamically -->
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-play me-2"></i>Generate Report
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Loading -->
+            <div class="loading text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2">Generating report...</p>
+            </div>
+
+            <!-- Report Results -->
+            <div class="report-section">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-table me-2"></i><span id="reportTitle">Report Results</span></h5>
+                        <button class="btn btn-light btn-sm" id="exportPdfBtn">
+                            <i class="fas fa-file-pdf me-1"></i>Export PDF
+                        </button>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-container">
+                            <table class="table table-striped table-hover modern-table mb-0" id="reportTable">
+                                <thead></thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="card-footer text-muted">
+                        <small>
+                            <i class="fas fa-info-circle me-1"></i>
+                            <span id="reportInfo">Report information will appear here</span>
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentReportData = null;
+
+        // Load available fields on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAvailableFields();
+        });
+
+        // Load available fields
+        function loadAvailableFields() {
+            fetch('/get_available_fields')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('fieldsContainer');
+                    container.innerHTML = '';
+                    
+                    data.fields.forEach(field => {
+                        const colDiv = document.createElement('div');
+                        colDiv.className = 'col-md-4 col-sm-6';
+                        colDiv.innerHTML = `
+                            <div class="form-check field-checkbox">
+                                <input class="form-check-input" type="checkbox" value="${field.name}" 
+                                       id="field_${field.name}" ${['key', 'summary', 'status'].includes(field.name) ? 'checked' : ''}>
+                                <label class="form-check-label" for="field_${field.name}">
+                                    ${field.label}
+                                </label>
+                            </div>
+                        `;
+                        container.appendChild(colDiv);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading fields:', error);
+                    showAlert('Failed to load available fields', 'danger');
+                });
+        }
+
+        // Handle form submission
+        document.getElementById('reportForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('jira_url', document.getElementById('jira_url').value);
+            formData.append('access_token', document.getElementById('access_token').value);
+            formData.append('jql_query', document.getElementById('jql_query').value);
+            formData.append('report_title', document.getElementById('report_title').value);
+            formData.append('report_size', document.getElementById('report_size').value);
+            
+            // Get selected fields
+            const selectedFields = Array.from(document.querySelectorAll('input[type="checkbox"]:checked'))
+                .map(cb => cb.value);
+            
+            if (selectedFields.length === 0) {
+                showAlert('Please select at least one field to display', 'warning');
+                return;
+            }
+            
+            selectedFields.forEach(field => formData.append('display_fields', field));
+            
+            // Show loading
+            document.querySelector('.loading').style.display = 'block';
+            document.querySelector('.report-section').style.display = 'none';
+            
+            // Generate report
+            fetch('/generate_custom_report', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.querySelector('.loading').style.display = 'none';
+                
+                if (data.success) {
+                    displayReport(data.report);
+                } else {
+                    showAlert(data.error || 'Report generation failed', 'danger');
+                }
+            })
+            .catch(error => {
+                document.querySelector('.loading').style.display = 'none';
+                console.error('Error:', error);
+                showAlert('An error occurred while generating the report', 'danger');
+            });
+        });
+
+        // Display report results
+        function displayReport(reportData) {
+            currentReportData = reportData;
+            
+            // Update report title
+            document.getElementById('reportTitle').textContent = reportData.title;
+            
+            // Update report info
+            const generatedDate = new Date(reportData.generated_at).toLocaleString();
+            document.getElementById('reportInfo').innerHTML = 
+                `Total Issues: <strong>${reportData.total_issues}</strong> | Generated: ${generatedDate}`;
+            
+            // Build table
+            const table = document.getElementById('reportTable');
+            const thead = table.querySelector('thead');
+            const tbody = table.querySelector('tbody');
+            
+            // Clear existing content
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+            
+            if (reportData.total_issues > 0) {
+                // Create header row
+                const headerRow = document.createElement('tr');
+                reportData.headers.forEach(header => {
+                    const th = document.createElement('th');
+                    th.textContent = header;
+                    headerRow.appendChild(th);
+                });
+                thead.appendChild(headerRow);
+                
+                // Create data rows
+                reportData.rows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    row.forEach(cell => {
+                        const td = document.createElement('td');
+                        td.textContent = cell;
+                        tr.appendChild(td);
+                    });
+                    tbody.appendChild(tr);
+                });
+            } else {
+                tbody.innerHTML = '<tr><td colspan="100%" class="text-center text-muted py-4">No data found</td></tr>';
+            }
+            
+            // Show report section
+            document.querySelector('.report-section').style.display = 'block';
+        }
+
+        // Export PDF
+        document.getElementById('exportPdfBtn').addEventListener('click', function() {
+            if (!currentReportData) {
+                showAlert('No report data to export', 'warning');
+                return;
+            }
+            
+            this.disabled = true;
+            this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Exporting...';
+            
+            fetch('/export_custom_report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({report: currentReportData})
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('PDF export failed');
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `jira_report_${new Date().toISOString().slice(0,10)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                showAlert('PDF exported successfully!', 'success');
+            })
+            .catch(error => {
+                console.error('Export error:', error);
+                showAlert('Failed to export PDF', 'danger');
+            })
+            .finally(() => {
+                this.disabled = false;
+                this.innerHTML = '<i class="fas fa-file-pdf me-1"></i>Export PDF';
+            });
+        });
+
+        // Show alert
+        function showAlert(message, type) {
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            document.querySelector('.report-container').insertBefore(alertDiv, document.querySelector('.report-container').firstChild);
+            
+            setTimeout(() => {
+                if (alertDiv.parentNode) {
+                    alertDiv.remove();
+                }
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
