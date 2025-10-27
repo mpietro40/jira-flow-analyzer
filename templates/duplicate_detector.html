@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Duplicate Story Detector</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .duplicate-group {
+            border: 2px solid #dc3545;
+            border-radius: 10px;
+            margin: 15px 0;
+            padding: 15px;
+            background: linear-gradient(135deg, #fff5f5 0%, #ffe6e6 100%);
+        }
+        .primary-issue {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            border: 2px solid #28a745;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+        }
+        .duplicate-issue {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            border: 1px solid #dc3545;
+            border-radius: 8px;
+            padding: 12px;
+            margin: 8px 0;
+        }
+        .similarity-badge {
+            font-size: 1.1em;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+        .similarity-high { background: #dc3545; color: white; }
+        .similarity-medium { background: #ffc107; color: #212529; }
+        .similarity-low { background: #6c757d; color: white; }
+        .stats-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <header class="bg-danger text-white py-2 px-4 mb-4">
+                    <div class="d-flex align-items-center">
+                        <div>
+                            <h1><i class="fas fa-search-plus"></i> Duplicate Story Detector</h1>
+                            <p class="mb-0">Identify potential duplicate stories in your Jira backlog</p>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Input Form -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3><i class="fas fa-cog"></i> Detection Configuration</h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="duplicateAnalysisForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="jira_url" class="form-label">Jira Server URL</label>
+                                        <input type="url" class="form-control" id="jira_url" name="jira_url" 
+                                               placeholder="https://your-company.atlassian.net" required>
+                                        <div class="form-text">Enter your Jira server URL</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="access_token" class="form-label">Access Token (PAT)</label>
+                                        <input type="password" class="form-control" id="access_token" name="access_token" 
+                                               placeholder="Your API token" required>
+                                        <div class="form-text">Personal Access Token for authentication</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="mb-3">
+                                        <label for="jql_query" class="form-label">JQL Query</label>
+                                        <input type="text" class="form-control" id="jql_query" name="jql_query" 
+                                               placeholder="project = MYPROJ AND issuetype = Story" required>
+                                        <div class="form-text">JQL query to fetch stories for duplicate detection (limit to ~1000 issues for performance)</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="fas fa-search"></i> Detect Duplicates
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Loading Indicator -->
+                <div id="loading" class="loading">
+                    <div class="spinner-border text-danger" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p class="mt-2">Analyzing stories for potential duplicates...</p>
+                </div>
+
+                <!-- Results Section -->
+                <div id="results" style="display: none;">
+                    <!-- Statistics Summary -->
+                    <div id="statsSection" class="row mb-4">
+                        <!-- Stats will be populated here -->
+                    </div>
+
+                    <!-- Duplicate Groups -->
+                    <div id="duplicateGroupsSection" class="mb-4">
+                        <h3><i class="fas fa-clone"></i> Potential Duplicate Groups</h3>
+                        <div id="duplicateGroups">
+                            <!-- Duplicate groups will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Download Report Button -->
+                    <div class="text-center mt-4">
+                        <button id="downloadReport" class="btn btn-success btn-lg">
+                            <i class="fas fa-download"></i> Download PDF Report
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Messages -->
+                <div id="messages"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let analysisResults = null;
+
+        document.getElementById('duplicateAnalysisForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('messages').innerHTML = '';
+            
+            fetch('/analyze_duplicates', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    analysisResults = data;
+                    displayResults(data.analysis_results);
+                    showMessage('Duplicate analysis completed successfully!', 'success');
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showMessage(`Network error: ${error.message}`, 'error');
+            });
+        });
+
+        function displayResults(results) {
+            // Display statistics
+            displayStatistics(results.statistics);
+            
+            // Display duplicate groups
+            displayDuplicateGroups(results.duplicate_groups);
+            
+            document.getElementById('results').style.display = 'block';
+        }
+
+        function displayStatistics(stats) {
+            const statsSection = document.getElementById('statsSection');
+            
+            statsSection.innerHTML = `
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <h4><i class="fas fa-list"></i> Total Issues</h4>
+                        <h2>${stats.total_groups}</h2>
+                        <small>Duplicate Groups Found</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <h4><i class="fas fa-clone"></i> Potential Duplicates</h4>
+                        <h2>${stats.potential_duplicates}</h2>
+                        <small>${stats.duplicate_percentage.toFixed(1)}% of analyzed issues</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <h4><i class="fas fa-layer-group"></i> Largest Group</h4>
+                        <h2>${stats.largest_group_size}</h2>
+                        <small>Issues in biggest group</small>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="stats-card">
+                        <h4><i class="fas fa-percentage"></i> Avg Similarity</h4>
+                        <h2>${stats.similarity_stats.average_similarity ? (stats.similarity_stats.average_similarity * 100).toFixed(1) + '%' : 'N/A'}</h2>
+                        <small>Average similarity score</small>
+                    </div>
+                </div>
+            `;
+        }
+
+        function displayDuplicateGroups(groups) {
+            const groupsContainer = document.getElementById('duplicateGroups');
+            groupsContainer.innerHTML = '';
+            
+            if (groups.length === 0) {
+                groupsContainer.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-check-circle"></i> 
+                        <strong>Great news!</strong> No potential duplicates found in the analyzed issues.
+                    </div>
+                `;
+                return;
+            }
+            
+            groups.forEach((group, index) => {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'duplicate-group';
+                
+                let groupHtml = `
+                    <h5><i class="fas fa-layer-group"></i> Group ${index + 1} (${group.group_size} issues)</h5>
+                    
+                    <div class="primary-issue">
+                        <h6><i class="fas fa-star"></i> Original Issue (Oldest)</h6>
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <strong>${group.primary_issue.key}</strong>: ${group.primary_issue.summary}
+                                <br><small class="text-muted">Created: ${formatDate(group.primary_issue.created)}</small>
+                                <br><small class="text-muted">Status: ${group.primary_issue.status}</small>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                group.duplicates.forEach(duplicate => {
+                    const similarityClass = getSimilarityClass(duplicate.similarity);
+                    groupHtml += `
+                        <div class="duplicate-issue">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <strong>${duplicate.issue.key}</strong>: ${duplicate.issue.summary}
+                                    <br><small class="text-muted">Created: ${formatDate(duplicate.issue.created)}</small>
+                                    <br><small class="text-muted">Status: ${duplicate.issue.status}</small>
+                                </div>
+                                <span class="similarity-badge ${similarityClass}">
+                                    ${(duplicate.similarity * 100).toFixed(1)}%
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                groupDiv.innerHTML = groupHtml;
+                groupsContainer.appendChild(groupDiv);
+            });
+        }
+
+        function getSimilarityClass(similarity) {
+            if (similarity >= 0.8) return 'similarity-high';
+            if (similarity >= 0.6) return 'similarity-medium';
+            return 'similarity-low';
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return 'Unknown';
+            return new Date(dateString).toLocaleDateString();
+        }
+
+        function showMessage(message, type) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = `<div class="${type}">${message}</div>`;
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    messagesDiv.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        // Download PDF report
+        document.getElementById('downloadReport').addEventListener('click', function() {
+            if (!analysisResults) {
+                showMessage('No analysis results available', 'error');
+                return;
+            }
+
+            fetch('/generate_duplicate_report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(analysisResults)
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('PDF generation failed');
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `duplicate_analysis_${new Date().toISOString().slice(0,10)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                showMessage('PDF report downloaded successfully!', 'success');
+            })
+            .catch(error => {
+                showMessage(`PDF generation error: ${error.message}`, 'error');
+            });
+        });
+    </script>
+</body>
+</html>

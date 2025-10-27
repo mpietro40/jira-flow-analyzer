@@ -208,6 +208,174 @@ def index():
     """Main page with input form for Jira connection details."""
     return render_template('index_epic.html')
 
+@app.route('/analyze_epic_status_validation', methods=['POST'])
+@rate_limit
+def analyze_epic_status_validation():
+    """
+    Analyze epics to find those with outdated status (To Do/Backlog but have in-progress children).
+    
+    Returns:
+        JSON response with outdated epics analysis
+    """
+    try:
+        # Extract and validate form data
+        jira_url = request.form.get('jira_url', '').strip()
+        access_token = request.form.get('access_token', '').strip()
+        jql_query = request.form.get('jql_query', '').strip()
+        
+        # Input validation
+        if not all([jira_url, access_token, jql_query]):
+            return jsonify({
+                'error': 'Missing required fields',
+                'error_type': 'ValidationError',
+                'error_details': {'suggestion': 'Please provide Jira URL, access token, and JQL query'}
+            }), 400
+        
+        # Validate Jira URL
+        if not validate_jira_url(jira_url):
+            return jsonify({
+                'error': 'Invalid Jira URL format',
+                'error_type': 'ValidationError',
+                'error_details': {'suggestion': 'Please provide a valid HTTPS Jira URL'}
+            }), 400
+        
+        # Sanitize JQL query
+        try:
+            jql_query = sanitize_jql(jql_query)
+        except ValueError as e:
+            return jsonify({
+                'error': f'Invalid JQL query: {str(e)}',
+                'error_type': 'ValidationError',
+                'error_details': {'suggestion': 'Please check your JQL syntax and avoid dangerous patterns'}
+            }), 400
+        
+        # Initialize Jira client
+        jira_client = JiraClient(jira_url, access_token)
+        
+        # Test connection first
+        if not jira_client.test_connection():
+            return jsonify({'error': 'Failed to connect to Jira. Please check your URL and access token.'}), 401
+        
+        # Perform epic status validation analysis
+        try:
+            from epic_obeya_analyzer import EpicObeyaAnalyzer
+            analyzer = EpicObeyaAnalyzer(jira_client)
+            results = analyzer.analyze_epic_status_validation(jql_query)
+        except ImportError as ie:
+            logger.error(f"Import error: {str(ie)}")
+            return jsonify({
+                'error': f'Module import failed: {str(ie)}',
+                'error_type': 'ImportError',
+                'error_details': {'suggestion': 'Please ensure epic_obeya_analyzer.py is in the correct directory'}
+            }), 500
+        
+        if 'error' in results:
+            return jsonify({
+                'error': results['error'],
+                'error_type': 'AnalysisError',
+                'error_details': {'suggestion': 'Please check your JQL query and permissions'}
+            }), 404
+        
+        logger.info(f"✅ Epic status validation completed for {urlparse(jira_url).netloc}")
+        return jsonify(results)
+        
+    except Exception as e:
+        error_type = type(e).__name__
+        logger.error(f"Error in epic status validation: {error_type} - {str(e)}", exc_info=True)
+        
+        return jsonify({
+            'error': str(e),
+            'error_type': error_type,
+            'error_details': {
+                'location': 'epic_status_validation',
+                'suggestion': 'Please check input data format and try again'
+            }
+        }), 500
+
+@app.route('/analyze_epic_distribution', methods=['POST'])
+@rate_limit
+def analyze_epic_distribution():
+    """
+    Analyze epic distribution across projects starting from initiatives.
+    
+    Returns:
+        JSON response with epic distribution analysis and pie chart
+    """
+    try:
+        # Extract and validate form data
+        jira_url = request.form.get('jira_url', '').strip()
+        access_token = request.form.get('access_token', '').strip()
+        jql_query = request.form.get('jql_query', '').strip()
+        
+        # Input validation
+        if not all([jira_url, access_token, jql_query]):
+            return jsonify({
+                'error': 'Missing required fields',
+                'error_type': 'ValidationError',
+                'error_details': {'suggestion': 'Please provide Jira URL, access token, and JQL query'}
+            }), 400
+        
+        # Validate Jira URL
+        if not validate_jira_url(jira_url):
+            return jsonify({
+                'error': 'Invalid Jira URL format',
+                'error_type': 'ValidationError',
+                'error_details': {'suggestion': 'Please provide a valid HTTPS Jira URL'}
+            }), 400
+        
+        # Sanitize JQL query
+        try:
+            jql_query = sanitize_jql(jql_query)
+        except ValueError as e:
+            return jsonify({
+                'error': f'Invalid JQL query: {str(e)}',
+                'error_type': 'ValidationError',
+                'error_details': {'suggestion': 'Please check your JQL syntax and avoid dangerous patterns'}
+            }), 400
+        
+        # Initialize Jira client
+        jira_client = JiraClient(jira_url, access_token)
+        
+        # Test connection first
+        if not jira_client.test_connection():
+            return jsonify({'error': 'Failed to connect to Jira. Please check your URL and access token.'}), 401
+        
+        # Perform epic distribution analysis
+        try:
+            from epic_obeya_analyzer import EpicObeyaAnalyzer
+            analyzer = EpicObeyaAnalyzer(jira_client)
+            results = analyzer.analyze_epic_distribution(jql_query)
+        except ImportError as ie:
+            logger.error(f"Import error: {str(ie)}")
+            return jsonify({
+                'error': f'Module import failed: {str(ie)}',
+                'error_type': 'ImportError',
+                'error_details': {'suggestion': 'Please ensure epic_obeya_analyzer.py is in the correct directory'}
+            }), 500
+        
+        if 'error' in results:
+            return jsonify({
+                'error': results['error'],
+                'error_type': 'AnalysisError',
+                'error_details': {'suggestion': 'Please check your JQL query and permissions'}
+            }), 404
+        
+        logger.info(f"✅ Epic distribution analysis completed for {urlparse(jira_url).netloc}")
+        return jsonify(results)
+        
+    except Exception as e:
+        error_type = type(e).__name__
+        logger.error(f"Error in epic distribution analysis: {error_type} - {str(e)}", exc_info=True)
+        
+        return jsonify({
+            'error': str(e),
+            'error_type': error_type,
+            'error_details': {
+                'location': 'epic_distribution_analysis',
+                'suggestion': 'Please check input data format and try again'
+            }
+        }), 500
+
 @app.route('/analyze_epics', methods=['POST'])
 @rate_limit
 def analyze_epics():
@@ -668,4 +836,4 @@ def update_estimates():
         return jsonify(error_response), 422
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5200)

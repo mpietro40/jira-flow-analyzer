@@ -2,7 +2,7 @@
 Sprint Analysis Application
 Analyzes sprint capacity, estimates, and forecasts feasibility based on historical data.
 
-Author: Sprint Analysis Tool
+Author: Sprint Analysis Tool - Pietro Maffi
 Purpose: Analyze sprint workload and predict feasibility using historical velocity
 """
 
@@ -17,6 +17,7 @@ import numpy as np
 # Reuse existing classes
 from jira_client import JiraClient
 from data_analyzer import DataAnalyzer
+from simple_sprint_retriever import SimpleSprintRetriever
 
 # Configure logging with same style
 # to enable debug change INFO to DEBUG in the next line
@@ -40,11 +41,17 @@ class SprintAnalyzer:
         """
         self.jira_client = jira_client
         self.data_analyzer = DataAnalyzer()
+        self.sprint_retriever = SimpleSprintRetriever(jira_client)
+        # Cache for sprint data to avoid duplicate calls
+        self._sprint_cache = {}
         # Default capacity configuration
         self.team_size = 8
         self.sprint_days = 10
         self.hours_per_day = 8
         self.completion_statuses = ['Done', 'Closed']
+        self.excluded_types = ['Epic']
+        # Configurable limits
+        self.max_results_limit = 2000
     
     def configure_capacity(self, team_size: int, sprint_days: int, hours_per_day: int):
         """
@@ -69,6 +76,16 @@ class SprintAnalyzer:
         """
         self.completion_statuses = [s.strip() for s in statuses_str.split(',') if s.strip()]
         logger.info(f"✅ Configured completion statuses: {self.completion_statuses}")
+    
+    def configure_excluded_types(self, types_str: str):
+        """
+        Configure excluded issue types.
+        
+        Args:
+            types_str (str): Comma-separated issue type names
+        """
+        self.excluded_types = [s.strip() for s in types_str.split(',') if s.strip()]
+        logger.info(f"🚫 Configured excluded types: {self.excluded_types}")
         
     def analyze_sprint(self, sprint_name: str, historical_months: int = 6) -> Dict:
         """
@@ -83,8 +100,8 @@ class SprintAnalyzer:
         """
         logger.info(f"📊 Starting sprint analysis for: {sprint_name}")
         
-        # Fetch sprint issues
-        sprint_issues = self._fetch_sprint_issues(sprint_name)
+        # Fetch sprint issues and details
+        sprint_issues, sprint_details = self._fetch_sprint_issues_with_details(sprint_name, historical_months)
         if not sprint_issues:
             logger.error(f"🚩 No issues found for sprint: {sprint_name}")
             return self._empty_result()
@@ -94,11 +111,11 @@ class SprintAnalyzer:
         # Analyze sprint workload
         workload_analysis = self._analyze_sprint_workload(sprint_issues)
         
-        # Get historical data for forecasting (filtered by sprint project)
-        historical_data = self._fetch_historical_data(historical_months, sprint_issues)
+        # Get historical data for forecasting (filtered by similar sprint names)
+        historical_data = self._fetch_historical_data_by_sprint_pattern(historical_months, sprint_name, sprint_issues)
         
-        # Generate forecast
-        forecast = self._generate_forecast(workload_analysis, historical_data)
+        # Generate forecast with date comparison
+        forecast = self._generate_forecast_with_dates(workload_analysis, historical_data, sprint_details)
         
         # Create comprehensive report
         report = self._create_sprint_report(sprint_name, workload_analysis, forecast, historical_data)
@@ -106,15 +123,15 @@ class SprintAnalyzer:
         logger.info("✅ Sprint analysis completed successfully")
         return report
     
-    def _fetch_sprint_issues(self, sprint_name: str) -> List[Dict]:
+    def _fetch_sprint_issues_with_details(self, sprint_name: str, historical_months: int = 6) -> Tuple[List[Dict], Dict]:
         """
-        Fetch all issues in the specified sprint.
+        Fetch all issues in the specified sprint along with sprint details.
         
         Args:
             sprint_name (str): Sprint name or ID
             
         Returns:
-            List[Dict]: List of issues in the sprint
+            Tuple[List[Dict], Dict]: List of issues and sprint details
         """
         logger.info(f"🔍 Fetching Jira issues for sprint: {sprint_name}")
         
@@ -126,23 +143,36 @@ class SprintAnalyzer:
             # If sprint_name contains text, use quoted format
             jql_query = f'sprint = "{sprint_name}"'
         
+        # Add excluded types filter
+        if self.excluded_types:
+            excluded_types_str = ','.join([f'"{t}"' for t in self.excluded_types])
+            jql_query += f' AND type NOT IN ({excluded_types_str})'
+            logger.info(f"🚫 Excluding issue types: {self.excluded_types}")
+        
         logger.debug(f"🔍 Using JQL query: {jql_query}")
         
         try:
-            issues = self.jira_client.fetch_issues(jql_query, max_results=1000)
+            issues = self.jira_client.fetch_issues(jql_query, max_results=self.max_results_limit)
             
             # Enhance issues with time tracking data
             enhanced_issues = []
-            for issue in issues:
+            logger.info(f"🔄 Enhancing {len(issues)} issues with time tracking data...")
+            for i, issue in enumerate(issues):
+                if i % 10 == 0 and i > 0:
+                    logger.info(f"📊 Enhanced {i}/{len(issues)} issues ({i/len(issues)*100:.1f}%)")
                 enhanced_issue = self._enhance_issue_with_time_data(issue, sprint_name)
                 if enhanced_issue:
                     enhanced_issues.append(enhanced_issue)
+            logger.info(f"✅ Completed enhancing {len(enhanced_issues)} issues")
             
-            return enhanced_issues
+            # Get sprint details
+            sprint_details = self._get_sprint_details(sprint_name, historical_months)
+            
+            return enhanced_issues, sprint_details
             
         except Exception as e:
             logger.error(f"🚩 Failed to fetch sprint issues: {str(e)}")
-            return []
+            return [], {}
     
     def _enhance_issue_with_time_data(self, issue: Dict, sprint_name: str = None) -> Optional[Dict]:
         """
@@ -393,12 +423,14 @@ class SprintAnalyzer:
             'issues_detail': issues
         }
     
-    def _fetch_historical_data(self, months_back: int, sprint_issues: List[Dict] = None) -> Dict:
+    def _fetch_historical_data_by_sprint_pattern(self, months_back: int, current_sprint_name: str, sprint_issues: List[Dict] = None) -> Dict:
         """
-        Fetch historical data for velocity calculation.
+        Fetch historical data filtered by similar sprint names.
         
         Args:
             months_back (int): Number of months of historical data
+            current_sprint_name (str): Current sprint name to extract pattern
+            sprint_issues (List[Dict]): Current sprint issues
             
         Returns:
             Dict: Historical velocity and completion data
@@ -424,9 +456,22 @@ class SprintAnalyzer:
                 project_filter = f' AND project IN ({project_list})'
                 logger.info(f"🏢 Filtering historical data to projects: {project_list}")
         
-        # Enhanced JQL for completed issues excluding epics and tests, filtered by project
+        # Get similar sprints using proper JQL
+        similar_sprints = self._get_similar_sprints(current_sprint_name, sprint_issues, months_back)
+        sprint_filter = f' AND sprint IN ({similar_sprints})' if similar_sprints else ''
+        
+        # Enhanced JQL for completed issues filtered by similar sprints
         status_list = ','.join(self.completion_statuses)
-        jql_query = f'resolved >= "{start_date.strftime("%Y-%m-%d")}" AND resolved <= "{end_date.strftime("%Y-%m-%d")}" AND type NOT IN (Epic, "XTest", "XTest Execution", "XTest Plan") AND status IN ({status_list}){project_filter}'
+        
+        # Build excluded types filter
+        excluded_types_list = ['"XTest"', '"XTest Execution"', '"XTest Plan"']
+        if self.excluded_types:
+            excluded_types_list.extend([f'"{t}"' for t in self.excluded_types])
+        excluded_types_str = ','.join(excluded_types_list)
+        
+        jql_query = f'resolved >= "{start_date.strftime("%Y-%m-%d")}" AND resolved <= "{end_date.strftime("%Y-%m-%d")}" AND type NOT IN ({excluded_types_str}) AND status IN ({status_list}){project_filter}{sprint_filter}'
+        
+        logger.info(f"🔍 Similar sprints filter: {similar_sprints[:100]}...")  # Truncate for readability
         
         logger.info(f"🔍 Using JQL: {jql_query}")
         
@@ -454,31 +499,41 @@ class SprintAnalyzer:
                 start_at += chunk_size
                 
                 # Safety limit to prevent infinite loops
-                if len(all_historical_issues) >= 1000:
-                    logger.info(f"⚠️ Reached safety limit of 1000 issues, stopping fetch")
+                if len(all_historical_issues) >= self.max_results_limit:
+                    logger.info(f"⚠️ Reached safety limit of {self.max_results_limit} issues, stopping fetch")
                     break
             
             logger.info(f"📈 Total historical issues fetched: {len(all_historical_issues)}")
             
             # Enhance with time data in chunks
             enhanced_historical = []
+            max_to_process = min(len(all_historical_issues), 500)
+            logger.info(f"🔄 Enhancing {max_to_process} historical issues with time data...")
+            
             for i, issue in enumerate(all_historical_issues[:500]):  # Process max 500 for performance
-                if i % 50 == 0:
-                    logger.info(f"🔄 Processing issue {i+1}/{min(len(all_historical_issues), 500)}")
+                if i % 25 == 0:
+                    logger.info(f"📊 Processing historical issue {i+1}/{max_to_process} ({(i+1)/max_to_process*100:.1f}%)")
                     
                 enhanced = self._enhance_issue_with_time_data(issue)
                 if enhanced:
                     enhanced_historical.append(enhanced)
             
+            logger.info(f"✅ Completed enhancing {len(enhanced_historical)} historical issues")
+            
             # Calculate historical velocity
             velocity_data = self._calculate_historical_velocity(enhanced_historical)
             
+            # Add sprint pattern and count information
+            velocity_data['sprint_pattern_used'] = getattr(self, '_current_sprint_pattern', '')
+            velocity_data['similar_sprints_count'] = len(similar_sprints.split(',')) if similar_sprints else 0
+            
             logger.info(f"✅ Analyzed {len(enhanced_historical)} enhanced historical issues")
+            logger.info(f"📊 Used {velocity_data['similar_sprints_count']} similar sprints with pattern: {velocity_data['sprint_pattern_used']}")
             return velocity_data
             
         except Exception as e:
             logger.error(f"🚩 Failed to fetch historical data: {str(e)}")
-            return {'average_velocity': 0, 'velocity_variance': 0, 'completion_rate': 0}
+            return {'average_velocity': 0, 'velocity_variance': 0, 'completion_rate': 0, 'sprint_pattern_used': ''}
     
     def _calculate_historical_velocity(self, historical_issues: List[Dict]) -> Dict:
         """
@@ -527,7 +582,10 @@ class SprintAnalyzer:
             'velocity_variance': velocity_variance,
             'completion_rate': completion_rate,
             'total_historical_issues': len(historical_issues),
-            'monte_carlo_forecast': monte_carlo_results
+            'monte_carlo_forecast': monte_carlo_results,
+            'sprint_pattern_used': getattr(self, '_current_sprint_pattern', ''),
+            'estimate_accuracy': 1.0,  # Default accuracy multiplier
+            'weekly_story_counts': weekly_story_counts
         }
     
     def _group_issues_by_week(self, issues: List[Dict]) -> List[int]:
@@ -607,16 +665,17 @@ class SprintAnalyzer:
             }
         }
     
-    def _generate_forecast(self, workload: Dict, historical: Dict) -> Dict:
+    def _generate_forecast_with_dates(self, workload: Dict, historical: Dict, sprint_details: Dict) -> Dict:
         """
-        Generate sprint feasibility forecast.
+        Generate sprint feasibility forecast with date comparison.
         
         Args:
             workload (Dict): Current sprint workload analysis
             historical (Dict): Historical velocity data
+            sprint_details (Dict): Sprint details including dates
             
         Returns:
-            Dict: Forecast results
+            Dict: Forecast results with date comparison
         """
         logger.info("🔮 Generating sprint feasibility forecast...")
         
@@ -667,6 +726,9 @@ class SprintAnalyzer:
         # Generate scenario analysis
         scenario_analysis = self._generate_scenario_analysis(remaining_stories, monte_carlo_data, workload)
         
+        # Calculate date-based forecast
+        date_forecast = self._calculate_date_forecast(estimated_days_needed, sprint_details)
+        
         forecast_result = {
             'estimated_weeks_needed': estimated_weeks_needed,
             'estimated_days_needed': estimated_days_needed,
@@ -676,7 +738,8 @@ class SprintAnalyzer:
             'risk_level': risk_level,
             'recommendations': recommendations,
             'monte_carlo_scenarios': scenario_analysis,
-            'remaining_stories': remaining_stories
+            'remaining_stories': remaining_stories,
+            'date_forecast': date_forecast
         }
         
         logger.info(f"🔮 Forecast: {estimated_days_needed:.1f} days ({estimated_weeks_needed:.1f} weeks) needed, {probability_of_completion:.0f}% completion probability")
@@ -870,6 +933,221 @@ class SprintAnalyzer:
                 'risk_level': forecast['risk_level']
             }
         }
+    
+    def _get_similar_sprints(self, current_sprint_name: str, sprint_issues: List[Dict] = None, months_back: int = 6) -> str:
+        """
+        Get list of similar sprint names using SprintRetriever with fallback.
+        
+        Args:
+            current_sprint_name (str): Current sprint name
+            sprint_issues (List[Dict]): Current sprint issues to extract project info
+            months_back (int): Months of historical data
+            
+        Returns:
+            str: Comma-separated list of sprint names for JQL IN clause
+        """
+        try:
+            # Use cached sprints if available
+            cache_key = f"{current_sprint_name}_{months_back}"
+            if cache_key not in self._sprint_cache:
+                logger.info(f"💾 Caching sprints for {current_sprint_name}")
+                # Set current sprint info for the retriever
+                self.sprint_retriever.current_sprint_name = current_sprint_name
+                if current_sprint_name.isdigit():
+                    self.sprint_retriever.current_sprint_id = int(current_sprint_name)
+                self._sprint_cache[cache_key] = self.sprint_retriever.get_sprints_from_same_board(current_sprint_name, months_back * 30)
+            
+            sprints = self._sprint_cache[cache_key]
+            if sprints:
+                similar_sprints = self._extract_similar_sprint_names(current_sprint_name, sprints)
+                logger.info(f"✅ Using cached sprints: {len(similar_sprints)} similar sprints from same board")
+                return similar_sprints
+            else:
+                logger.warning("⚠️ No sprints found from same board")
+                return ''
+            
+        except Exception as e:
+            logger.error(f"⚠️ Failed to get similar sprints: {str(e)}")
+            return ''
+    
+    def _extract_similar_sprint_names(self, current_sprint_name: str, sprints: List[Dict]) -> str:
+        """
+        Extract similar sprint names from sprint list using pattern matching.
+        
+        Args:
+            current_sprint_name (str): Current sprint name
+            sprints (List[Dict]): List of sprint dictionaries
+            
+        Returns:
+            str: Comma-separated list of sprint names for JQL IN clause
+        """
+        if not current_sprint_name or current_sprint_name.isdigit():
+            return ''
+        
+        similar_sprints = []
+        
+        # Extract pattern from current sprint name
+        import re
+        pattern_match = re.match(r'^(.+?\s+Sprint)\s+\d+', current_sprint_name)
+        if pattern_match:
+            base_pattern = pattern_match.group(1)
+            self._current_sprint_pattern = base_pattern + ' *'
+            
+            # Find sprints matching the pattern
+            for sprint in sprints:
+                sprint_name = sprint.get('name', '')
+                if sprint_name.startswith(base_pattern) and sprint_name != current_sprint_name:
+                    similar_sprints.append(f'"{sprint_name}"')
+            
+            logger.info(f"🔍 Found {len(similar_sprints)} similar sprints for pattern '{base_pattern}'")
+            return ','.join(similar_sprints[:20])  # Limit to 20 sprints
+        
+        # Fallback: use first part before numbers
+        fallback_match = re.match(r'^(.+?)\s+\d+', current_sprint_name)
+        if fallback_match:
+            base_pattern = fallback_match.group(1)
+            self._current_sprint_pattern = base_pattern + ' *'
+            
+            for sprint in sprints:
+                sprint_name = sprint.get('name', '')
+                if sprint_name.startswith(base_pattern) and sprint_name != current_sprint_name:
+                    similar_sprints.append(f'"{sprint_name}"')
+            
+            logger.info(f"🔍 Found {len(similar_sprints)} similar sprints for fallback pattern '{base_pattern}'")
+            return ','.join(similar_sprints[:20])  # Limit to 20 sprints
+        
+        logger.warning(f"⚠️ Could not extract pattern from: '{current_sprint_name}'")
+        return ''
+    
+
+    
+    def _get_sprint_details(self, sprint_name: str, months_back: int = 6) -> Dict:
+        """
+        Get sprint details including planned end date using direct API call.
+        
+        Args:
+            sprint_name (str): Sprint name or ID
+            months_back (int): Not used but kept for compatibility
+            
+        Returns:
+            Dict: Sprint details with dates
+        """
+        try:
+            if not sprint_name:
+                logger.warning("⚠️ Empty sprint name provided")
+                return {}
+            
+            logger.info(f"🔍 Getting sprint details for: '{sprint_name}'")
+            
+            # Try direct API call if sprint is numeric (ID)
+            if sprint_name.isdigit():
+                url = f"{self.jira_client.base_url}/rest/agile/1.0/sprint/{sprint_name}"
+                logger.info(f"🔍 Direct API call: {url}")
+                response = self.jira_client.session.get(url)
+                
+                if response.status_code == 200:
+                    sprint_data = response.json()
+                    logger.info(f"📅 Direct sprint data: {sprint_data}")
+                    return {
+                        'id': sprint_data.get('id'),
+                        'name': sprint_data.get('name'),
+                        'state': sprint_data.get('state'),
+                        'start_date': sprint_data.get('startDate'),
+                        'end_date': sprint_data.get('endDate'),
+                        'complete_date': sprint_data.get('completeDate')
+                    }
+            
+            # Fallback to cached sprints
+            cache_key = f"{sprint_name}_6"
+            if cache_key in self._sprint_cache:
+                logger.info(f"💾 Using cached sprints for sprint details")
+                sprints = self._sprint_cache[cache_key]
+                for sprint in sprints:
+                    if sprint.get('name') == sprint_name or str(sprint.get('id')) == sprint_name:
+                        logger.info(f"📅 Found sprint details from cache: {sprint}")
+                        return sprint
+            
+            logger.warning(f"⚠️ Sprint details not found for: {sprint_name}")
+            return {}
+                
+        except Exception as e:
+            logger.error(f"⚠️ Failed to get sprint details for '{sprint_name}': {str(e)}")
+            return {}
+    
+    def _calculate_date_forecast(self, estimated_days_needed: float, sprint_details: Dict) -> Dict:
+        """
+        Calculate date-based forecast comparing planned end date vs estimated completion.
+        
+        Args:
+            estimated_days_needed (float): Estimated days needed to complete
+            sprint_details (Dict): Sprint details including end date
+            
+        Returns:
+            Dict: Date forecast with comparison
+        """
+        from dateutil import parser
+        
+        result = {
+            'planned_end_date': None,
+            'estimated_completion_date': None,
+            'days_difference': 0,
+            'will_finish_on_time': True,
+            'missing_days': 0,
+            'date_risk_level': 'LOW'
+        }
+        
+        try:
+            from datetime import date, timedelta
+            today = date.today()
+            estimated_completion = today + timedelta(days=int(estimated_days_needed))
+            result['estimated_completion_date'] = estimated_completion.isoformat()
+            
+            planned_end_str = sprint_details.get('end_date')
+            logger.info(f"📅 Sprint details received: {sprint_details}")
+            logger.info(f"📅 Planned end date string: {planned_end_str}")
+            
+            if planned_end_str:
+                # Parse planned end date
+                planned_end = parser.parse(planned_end_str).date()
+                result['planned_end_date'] = planned_end.isoformat()
+                logger.info(f"📅 Parsed planned end date: {planned_end}")
+                
+                # Calculate difference
+                days_diff = (estimated_completion - planned_end).days
+                result['days_difference'] = days_diff
+                result['will_finish_on_time'] = days_diff <= 0
+                result['missing_days'] = max(0, days_diff)
+                
+                # Determine risk level based on date difference
+                if days_diff <= 0:
+                    result['date_risk_level'] = 'LOW'
+                elif days_diff <= 3:
+                    result['date_risk_level'] = 'MEDIUM'
+                else:
+                    result['date_risk_level'] = 'HIGH'
+                
+                logger.info(f"📅 Date forecast: Planned={planned_end}, Estimated={estimated_completion}, Diff={days_diff} days")
+            else:
+                # Fallback: No planned end date available
+                logger.warning("⚠️ No planned end date found - using forecast-only timeline")
+                result['planned_end_date'] = None
+                result['days_difference'] = 0
+                result['will_finish_on_time'] = True
+                result['missing_days'] = 0
+                result['date_risk_level'] = 'MEDIUM'  # Unknown timeline = medium risk
+                
+                logger.info(f"📅 Fallback forecast: Estimated completion={estimated_completion} (no planned date available)")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to calculate date forecast: {str(e)}")
+            # Ensure estimated completion date is always set
+            from datetime import date, timedelta
+            today = date.today()
+            estimated_completion = today + timedelta(days=int(estimated_days_needed))
+            result['estimated_completion_date'] = estimated_completion.isoformat()
+            logger.info(f"📅 Fallback: Estimated completion={estimated_completion}")
+        
+        return result
     
     def _empty_result(self) -> Dict:
         """Return empty result structure."""

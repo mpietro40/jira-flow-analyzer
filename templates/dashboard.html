@@ -54,11 +54,19 @@
                     <li class="nav-item">
                         <a class="nav-link active" href="/">Dashboard</a>
                     </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/presentation">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="presentationDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="fas fa-presentation me-1"></i>
-                            Generate Presentation
+                            Presentations
                         </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/presentation">
+                                <i class="fas fa-chart-bar me-2"></i>Analytics Suite
+                            </a></li>
+                            <li><a class="dropdown-item" href="/custom-presentation">
+                                <i class="fas fa-edit me-2"></i>Custom Slides
+                            </a></li>
+                        </ul>
                     </li>
                 </ul>
             </div>
@@ -80,7 +88,7 @@
                     <div class="stats-card p-4">
                         <div class="row text-center">
                             <div class="col-3">
-                                <h3 class="fw-bold">4</h3>
+                                <h3 class="fw-bold">7</h3>
                                 <small>Analytics Tools</small>
                             </div>
                             <div class="col-3">
@@ -204,6 +212,78 @@
                             </ul>
                             <a href="/epic-analyzer" class="btn btn-success btn-lg w-100">
                                 <i class="fas fa-play me-2"></i>Launch Analyzer
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Duplicate Detector -->
+                <div class="col-lg-6 col-md-6">
+                    <div class="card app-card h-100 shadow">
+                        <div class="card-body text-center p-4">
+                            <div class="app-icon text-danger">
+                                <i class="fas fa-search-plus"></i>
+                            </div>
+                            <h4 class="card-title fw-bold">Duplicate Detector</h4>
+                            <p class="card-text text-muted mb-4">
+                                Identify potential duplicate stories in your backlog using text similarity analysis.
+                            </p>
+                            <ul class="list-unstyled text-start mb-4">
+                                <li><i class="fas fa-check text-success me-2"></i>Text similarity analysis</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Similarity percentage scoring</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Grouped duplicate detection</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Oldest issue identification</li>
+                            </ul>
+                            <a href="/duplicate-detector" class="btn btn-danger btn-lg w-100">
+                                <i class="fas fa-play me-2"></i>Launch Detector
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Psychological Safety Analyzer -->
+                <div class="col-lg-6 col-md-6">
+                    <div class="card app-card h-100 shadow">
+                        <div class="card-body text-center p-4">
+                            <div class="app-icon" style="color: #4CAF50;">
+                                <i class="fas fa-heart"></i>
+                            </div>
+                            <h4 class="card-title fw-bold">Psychological Safety</h4>
+                            <p class="card-text text-muted mb-4">
+                                Measure team psychological safety through Jira comment analysis and interaction patterns.
+                            </p>
+                            <ul class="list-unstyled text-start mb-4">
+                                <li><i class="fas fa-check text-success me-2"></i>Comment participation tracking</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Question frequency analysis</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Weekly historical data</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Trend visualization</li>
+                            </ul>
+                            <a href="/psychological-safety" class="btn btn-lg w-100" style="background: #4CAF50; color: white; border: none;">
+                                <i class="fas fa-play me-2"></i>Launch Analyzer
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Report Generator -->
+                <div class="col-lg-6 col-md-6">
+                    <div class="card app-card h-100 shadow">
+                        <div class="card-body text-center p-4">
+                            <div class="app-icon" style="color: #667eea;">
+                                <i class="fas fa-table"></i>
+                            </div>
+                            <h4 class="card-title fw-bold">Report Generator</h4>
+                            <p class="card-text text-muted mb-4">
+                                Create custom reports with selected fields and export to professional PDF format.
+                            </p>
+                            <ul class="list-unstyled text-start mb-4">
+                                <li><i class="fas fa-check text-success me-2"></i>Custom field selection</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Modern table display</li>
+                                <li><i class="fas fa-check text-success me-2"></i>PDF export capability</li>
+                                <li><i class="fas fa-check text-success me-2"></i>Cached query performance</li>
+                            </ul>
+                            <a href="/reports" class="btn btn-lg w-100" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none;">
+                                <i class="fas fa-play me-2"></i>Launch Generator
                             </a>
                         </div>
                     </div>

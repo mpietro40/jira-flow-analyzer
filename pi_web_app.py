@@ -11,6 +11,9 @@ import logging
 from datetime import datetime
 import os
 import tempfile
+import json
+import threading
+from pathlib import Path
 
 from jira_client import JiraClient
 from pi_analyzer import PIAnalyzer
@@ -22,6 +25,68 @@ logger = logging.getLogger('PIWebApp')
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'pi-analysis-key-change-in-production')
+
+# Results directory
+RESULTS_DIR = Path(__file__).parent / 'pi_results'
+RESULTS_DIR.mkdir(exist_ok=True)
+
+analysis_lock = threading.Lock()
+
+def save_analysis_to_file(cache_key, analysis_results):
+    """Save analysis results to JSON file."""
+    try:
+        filepath = RESULTS_DIR / f"{cache_key}.json"
+        data = {
+            'results': analysis_results,
+            'timestamp': datetime.now().isoformat(),
+            'cache_key': cache_key
+        }
+        with open(filepath, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+        logger.info(f"💾 Saved analysis to {filepath}")
+        return True
+    except Exception as e:
+        logger.error(f"❌ Failed to save analysis: {str(e)}")
+        return False
+
+def load_analysis_from_file(cache_key):
+    """Load analysis results from JSON file."""
+    try:
+        filepath = RESULTS_DIR / f"{cache_key}.json"
+        if filepath.exists():
+            with open(filepath, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            logger.info(f"📂 Loaded analysis from {filepath}")
+            return data
+        return None
+    except Exception as e:
+        logger.error(f"❌ Failed to load analysis: {str(e)}")
+        return None
+
+def list_saved_analyses():
+    """List all saved analysis files."""
+    try:
+        analyses = []
+        for filepath in RESULTS_DIR.glob('*.json'):
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                results = data.get('results', {})
+                pi_period = results.get('pi_period', {})
+                analyses.append({
+                    'cache_key': data.get('cache_key', filepath.stem),
+                    'start_date': pi_period.get('start_date'),
+                    'end_date': pi_period.get('end_date'),
+                    'timestamp': data.get('timestamp'),
+                    'total_issues': results.get('summary', {}).get('total_issues', 0),
+                    'filename': filepath.name
+                })
+            except Exception as e:
+                logger.warning(f"⚠️ Skipping invalid file {filepath.name}: {str(e)}")
+        return sorted(analyses, key=lambda x: x['timestamp'], reverse=True)
+    except Exception as e:
+        logger.error(f"❌ Failed to list analyses: {str(e)}")
+        return []
 
 @app.route('/')
 def index():
@@ -74,14 +139,42 @@ def analyze_pi():
             'request_date': datetime.now().isoformat()
         })
         
+        # Save results to file
+        cache_key = f"{pi_start_date}_{pi_end_date}"
+        with analysis_lock:
+            save_analysis_to_file(cache_key, analysis_results)
+        
+        logger.info(f"✅ PI analysis completed and saved with key: {cache_key}")
+        
         return jsonify({
             'success': True,
-            'analysis_results': analysis_results
+            'analysis_results': analysis_results,
+            'cache_key': cache_key
         })
         
     except Exception as e:
         logger.error(f"🚩 PI Analysis error: {str(e)}")
         return jsonify({'error': f'PI Analysis failed: {str(e)}'}), 500
+
+@app.route('/get_cached_results/<cache_key>', methods=['GET'])
+def get_cached_results(cache_key):
+    """Retrieve saved analysis results from file."""
+    with analysis_lock:
+        cached_data = load_analysis_from_file(cache_key)
+        if cached_data:
+            return jsonify({
+                'success': True,
+                'analysis_results': cached_data['results'],
+                'cached_at': cached_data['timestamp']
+            })
+        else:
+            return jsonify({'error': 'No saved results found for this key'}), 404
+
+@app.route('/list_cached_results', methods=['GET'])
+def list_cached_results():
+    """List all available saved results from files."""
+    cached_list = list_saved_analyses()
+    return jsonify({'cached_results': cached_list})
 
 @app.route('/generate_pi_report', methods=['POST'])
 def generate_pi_report():

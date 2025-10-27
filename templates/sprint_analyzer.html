@@ -60,7 +60,7 @@
     <div class="container-fluid">
         <div class="row">
             <div class="col-md-12">
-                <header class="bg-primary text-white p-4 mb-4">
+                <header class="bg-info text-white p-4 mb-4">
                     <h1><i class="fas fa-rocket"></i> Sprint Analyzer</h1>
                     <p class="mb-0">Analyze sprint capacity and forecast feasibility with historical data 
                         <i class="fas fa-info-circle" style="cursor: pointer;" data-bs-toggle="modal" data-bs-target="#infoModal" title="Click for more information"></i>
@@ -117,25 +117,25 @@
                             
                             <!-- Sprint Capacity Configuration -->
                             <div class="row">
-                                <div class="col-md-2">
+                                <div class="col-md-1">
                                     <div class="mb-3">
                                         <label for="team_size" class="form-label">Team Size</label>
                                         <input type="number" class="form-control" id="team_size" name="team_size" 
-                                               value="8" min="1" max="999" style="max-width: 80px;" required>
+                                               value="8" min="1" max="999" style="max-width: 70px;" required>
                                     </div>
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-1">
                                     <div class="mb-3">
                                         <label for="sprint_days" class="form-label">Sprint Days</label>
                                         <input type="number" class="form-control" id="sprint_days" name="sprint_days" 
-                                               value="10" min="1" max="999" style="max-width: 80px;" required>
+                                               value="10" min="1" max="999" style="max-width: 70px;" required>
                                     </div>
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-1">
                                     <div class="mb-3">
                                         <label for="hours_per_day" class="form-label">Hours/Day</label>
                                         <input type="number" class="form-control" id="hours_per_day" name="hours_per_day" 
-                                               value="8" min="1" max="999" style="max-width: 80px;" required>
+                                               value="8" min="1" max="999" style="max-width: 70px;" required>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
@@ -144,6 +144,14 @@
                                         <input type="text" class="form-control" id="completion_statuses" name="completion_statuses" 
                                                value="Done,Closed" required>
                                         <div class="form-text">Comma-separated status names</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="mb-3">
+                                        <label for="excluded_types" class="form-label">Excluded Types</label>
+                                        <input type="text" class="form-control" id="excluded_types" name="excluded_types" 
+                                               value="Epic" required>
+                                        <div class="form-text">Comma-separated issue types</div>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
@@ -203,6 +211,32 @@
                             <div class="card metric-card text-center">
                                 <h3><span id="completionProbability">0</span>%</h3>
                                 <p class="mb-0">Completion Probability</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Date Forecast -->
+                    <div id="dateForecastSection" class="card mb-4" style="display: none;">
+                        <div class="card-header">
+                            <h5><i class="fas fa-calendar-alt"></i> Sprint Timeline Forecast</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4 text-center">
+                                    <h6>Planned End Date</h6>
+                                    <h4 id="plannedEndDate">-</h4>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <h6>Estimated Completion</h6>
+                                    <h4 id="estimatedCompletionDate">-</h4>
+                                </div>
+                                <div class="col-md-4 text-center">
+                                    <h6>Timeline Status</h6>
+                                    <div id="timelineStatus" class="alert alert-info">
+                                        <h5 id="timelineMessage">On Track</h5>
+                                        <p id="daysDifference" class="mb-0">0 days difference</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -289,7 +323,7 @@
                             <div id="monteCarloSection" style="display: none;">
                                 <hr>
                                 <h6><i class="fas fa-dice"></i> Monte Carlo Velocity Distribution</h6>
-                                <div class="row">
+                                <div class="row mb-3">
                                     <div class="col-md-4 text-center">
                                         <div class="badge badge-success p-2">
                                             <strong>P90 (Optimistic)</strong><br>
@@ -307,6 +341,24 @@
                                             <strong>P10 (Pessimistic)</strong><br>
                                             <span id="p10Velocity">0</span> stories/week
                                         </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Additional Monte Carlo Details -->
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <small class="text-muted">
+                                            <strong>Velocity Variance:</strong> <span id="velocityVariance">0</span><br>
+                                            <strong>Weekly Data Points:</strong> <span id="weeklyDataPoints">0</span> weeks<br>
+                                            <strong>Estimate Accuracy:</strong> <span id="estimateAccuracyDetail">1.0</span>x (time estimates vs actual)
+                                        </small>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small class="text-muted">
+                                            <strong>Historical Completion Rate:</strong> <span id="completionRateDetail">0</span>% (issues reaching Done status)<br>
+                                            <strong>Simulation:</strong> 10,000 iterations based on historical velocity patterns<br>
+                                            <strong>Weekly Story Data:</strong> <span id="weeklyStoryData">[]</span>
+                                        </small>
                                     </div>
                                 </div>
                             </div>
@@ -514,11 +566,61 @@
                 statusContainer.innerHTML += statusCard;
             });
             
+            // Update date forecast - always show if we have forecast data
+            const dateForecast = results.forecast_details.date_forecast;
+            if (dateForecast) {
+                if (dateForecast.planned_end_date) {
+                    document.getElementById('plannedEndDate').textContent = new Date(dateForecast.planned_end_date).toLocaleDateString();
+                } else {
+                    document.getElementById('plannedEndDate').textContent = 'Not Available';
+                }
+                
+                if (dateForecast.estimated_completion_date) {
+                    document.getElementById('estimatedCompletionDate').textContent = new Date(dateForecast.estimated_completion_date).toLocaleDateString();
+                } else {
+                    document.getElementById('estimatedCompletionDate').textContent = 'Not Available';
+                }
+                
+                const timelineStatus = document.getElementById('timelineStatus');
+                const timelineMessage = document.getElementById('timelineMessage');
+                const daysDifference = document.getElementById('daysDifference');
+                
+                if (dateForecast.planned_end_date && dateForecast.will_finish_on_time) {
+                    timelineStatus.className = 'alert alert-success';
+                    timelineMessage.textContent = 'On Track';
+                    daysDifference.textContent = dateForecast.days_difference === 0 ? 'Exactly on time' : `${Math.abs(dateForecast.days_difference)} days early`;
+                } else if (dateForecast.planned_end_date && !dateForecast.will_finish_on_time) {
+                    const riskClass = dateForecast.date_risk_level === 'HIGH' ? 'alert-danger' : 'alert-warning';
+                    timelineStatus.className = `alert ${riskClass}`;
+                    timelineMessage.textContent = 'Behind Schedule';
+                    daysDifference.textContent = `${dateForecast.missing_days} days behind`;
+                } else {
+                    timelineStatus.className = 'alert alert-secondary';
+                    timelineMessage.textContent = 'No Sprint End Date';
+                    daysDifference.textContent = 'Cannot compare dates - sprint end date not found in Jira';
+                }
+                
+                document.getElementById('dateForecastSection').style.display = 'block';
+            }
+            
             // Update historical context
             document.getElementById('avgVelocity').textContent = results.historical_context.average_velocity;
             document.getElementById('estimateAccuracy').textContent = results.historical_context.estimate_accuracy;
             document.getElementById('completionRate').textContent = results.historical_context.completion_rate;
             document.getElementById('historicalIssues').textContent = results.historical_context.total_historical_issues;
+            
+            // Show sprint pattern used if available
+            if (results.historical_context.sprint_pattern_used) {
+                const patternInfo = `<div class="alert alert-info mt-2">
+                    <small><i class="fas fa-filter"></i> Historical data: <strong>${results.historical_context.similar_sprints_count}</strong> similar sprints found using pattern: <strong>${results.historical_context.sprint_pattern_used}</strong></small>
+                </div>`;
+                document.getElementById('messages').innerHTML += patternInfo;
+            } else if (results.historical_context.total_historical_issues > 0) {
+                const noPatternInfo = `<div class="alert alert-warning mt-2">
+                    <small><i class="fas fa-exclamation-triangle"></i> No similar sprint pattern found - using all <strong>${results.historical_context.total_historical_issues}</strong> historical issues</small>
+                </div>`;
+                document.getElementById('messages').innerHTML += noPatternInfo;
+            }
             
             // Update Monte Carlo section if available
             if (results.historical_context.monte_carlo_enabled && results.historical_context.velocity_percentiles) {
@@ -526,6 +628,15 @@
                 document.getElementById('p90Velocity').textContent = Math.round(percentiles.p90 || 0);
                 document.getElementById('p50Velocity').textContent = Math.round(percentiles.p50 || 0);
                 document.getElementById('p10Velocity').textContent = Math.round(percentiles.p10 || 0);
+                
+                // Update additional details
+                const historical = results.historical_context;
+                document.getElementById('velocityVariance').textContent = Math.round(historical.velocity_variance || 0);
+                document.getElementById('weeklyDataPoints').textContent = (historical.weekly_story_counts || []).length;
+                document.getElementById('estimateAccuracyDetail').textContent = (historical.estimate_accuracy || 1.0).toFixed(1);
+                document.getElementById('completionRateDetail').textContent = Math.round(historical.completion_rate || 0);
+                document.getElementById('weeklyStoryData').textContent = JSON.stringify(historical.weekly_story_counts || []);
+                
                 document.getElementById('monteCarloSection').style.display = 'block';
                 
                 // Update scenario analysis

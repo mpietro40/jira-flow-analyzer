@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Epic Fix Version Distribution</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --success-color: #28a745;
+            --danger-color: #dc3545;
+            --warning-color: #ffc107;
+            --info-color: #17a2b8;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .header-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .header-card h1 {
+            color: var(--primary-color);
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .input-card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .form-label {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .form-control, .form-select {
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            padding: 12px;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+
+        .btn-analyze {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 10px;
+            color: white;
+            transition: transform 0.2s;
+        }
+
+        .btn-analyze:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+            border-width: 0.3rem;
+        }
+
+        .results-container {
+            display: none;
+        }
+
+        .summary-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+        }
+
+        .stat-box.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .stat-box.success {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+            color: white;
+        }
+
+        .stat-box.info {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+        }
+
+        .stat-box h3 {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .stat-box p {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .initiative-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            border-left: 5px solid var(--primary-color);
+        }
+
+        .initiative-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .initiative-title {
+            font-size: 1.3rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .epic-count-badge {
+            background: var(--primary-color);
+            color: white;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: bold;
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+
+        .epic-table {
+            width: 100%;
+            min-width: 1400px;
+            white-space: nowrap;
+        }
+
+        .epic-table thead {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .epic-table th {
+            padding: 10px 8px;
+            font-weight: 600;
+            text-align: left;
+            font-size: 0.9rem;
+        }
+
+        .epic-table td {
+            padding: 8px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.85rem;
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .epic-table td.wrap {
+            white-space: normal;
+            word-wrap: break-word;
+        }
+
+        .epic-table tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        .epic-key {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+
+        .status-badge {
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .status-done {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-progress {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-todo {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .alert {
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 60px;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .no-results i {
+            font-size: 4rem;
+            color: #ccc;
+            margin-bottom: 20px;
+        }
+
+        .view-toggle {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .view-toggle button {
+            padding: 10px 30px;
+            margin: 0 10px;
+            border: 2px solid var(--primary-color);
+            background: white;
+            color: var(--primary-color);
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .view-toggle button.active {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+        }
+
+        .view-toggle button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+
+        .kanban-board {
+            display: none;
+            gap: 15px;
+            overflow-x: auto;
+            padding: 10px;
+        }
+
+        .kanban-board.active {
+            display: flex;
+        }
+
+        .kanban-column {
+            flex: 1;
+            min-width: 280px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+        }
+
+        .kanban-column-header {
+            font-weight: bold;
+            font-size: 1.1rem;
+            margin-bottom: 15px;
+            padding: 10px;
+            border-radius: 8px;
+            text-align: center;
+            color: white;
+        }
+
+        .kanban-column-header.todo {
+            background: linear-gradient(135deg, #6c757d 0%, #495057 100%);
+        }
+
+        .kanban-column-header.doing {
+            background: linear-gradient(135deg, #0dcaf0 0%, #0891b2 100%);
+        }
+
+        .kanban-column-header.waiting {
+            background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+        }
+
+        .kanban-column-header.done {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+        }
+
+        .kanban-card {
+            background: white;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .kanban-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transform: translateY(-2px);
+        }
+
+        .kanban-card-id {
+            font-weight: bold;
+            color: var(--primary-color);
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .kanban-card-title {
+            font-size: 0.95rem;
+            margin-bottom: 8px;
+            line-height: 1.3;
+            color: #333;
+        }
+
+        .kanban-card-assignee {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+        }
+
+        .kanban-card-assignee i {
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Header -->
+        <div class="header-card">
+            <h1><i class="fas fa-project-diagram"></i> Epic Distribution Analysis</h1>
+            <p class="text-muted mb-0">Analyze epics across initiatives through hierarchy (Initiative → Feature → Sub-Feature → Epic)</p>
+            <p class="text-muted mb-0"><small>Optionally filter by fix version</small></p>
+        </div>
+
+        <!-- Input Form -->
+        <div class="input-card">
+            <h3 class="mb-4"><i class="fas fa-cog"></i> Analysis Parameters</h3>
+            <form id="analysisForm">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="jira_url" class="form-label">
+                            <i class="fas fa-link"></i> Jira Server URL
+                        </label>
+                        <input type="url" class="form-control" id="jira_url" name="jira_url" 
+                               placeholder="https://your-company.atlassian.net" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="access_token" class="form-label">
+                            <i class="fas fa-key"></i> Access Token (PAT)
+                        </label>
+                        <input type="password" class="form-control" id="access_token" name="access_token" 
+                               placeholder="Your API token" required>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="initiative_jql" class="form-label">
+                            <i class="fas fa-search"></i> Initiative JQL Query
+                        </label>
+                        <input type="text" class="form-control" id="initiative_jql" name="initiative_jql" 
+                               placeholder='project = ISDOP AND type = "Business Initiative"' required>
+                        <small class="text-muted">JQL query to find initiatives</small>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="fix_version" class="form-label">
+                            <i class="fas fa-tag"></i> Fix Version (Optional)
+                        </label>
+                        <input type="text" class="form-control" id="fix_version" name="fix_version" 
+                               placeholder="e.g., 2025.Q1">
+                        <small class="text-muted">Leave empty for all</small>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label for="excluded_statuses" class="form-label">
+                            <i class="fas fa-ban"></i> Excluded Statuses
+                        </label>
+                        <input type="text" class="form-control" id="excluded_statuses" name="excluded_statuses" 
+                               placeholder="Done, Closed, Abandoned, Cancelled, Resolved">
+                        <small class="text-muted">Comma-separated</small>
+                    </div>
+                </div>
+                <div class="text-center mt-4">
+                    <button type="submit" class="btn btn-analyze">
+                        <i class="fas fa-chart-bar"></i> Analyze Distribution
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading">
+            <div class="spinner-border text-primary" role="status"></div>
+            <p class="mt-3 text-muted">Analyzing epic distribution across initiatives...</p>
+        </div>
+
+        <!-- Error Messages -->
+        <div id="errorContainer"></div>
+
+        <!-- Results Container -->
+        <div id="resultsContainer" class="results-container">
+            <!-- Export Button and View Toggle -->
+            <div class="text-center mb-4">
+                <button id="exportPdfBtn" class="btn btn-success btn-lg">
+                    <i class="fas fa-file-pdf"></i> Export to PDF
+                </button>
+            </div>
+            <div class="view-toggle">
+                <button id="tableViewBtn" class="active" onclick="switchView('table')">
+                    <i class="fas fa-table"></i> Table View
+                </button>
+                <button id="kanbanViewBtn" onclick="switchView('kanban')">
+                    <i class="fas fa-columns"></i> Kanban View
+                </button>
+            </div>
+            <!-- Summary Statistics -->
+            <div class="summary-card">
+                <h3 class="mb-4"><i class="fas fa-chart-pie"></i> Analysis Summary</h3>
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="stat-box primary">
+                            <h3 id="totalInitiatives">0</h3>
+                            <p>Total Initiatives</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-box success">
+                            <h3 id="initiativesWithEpics">0</h3>
+                            <p>With Epics</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-box info">
+                            <h3 id="totalEpics">0</h3>
+                            <p>Total Epics</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="stat-box primary">
+                            <h3 id="fixVersionDisplay">-</h3>
+                            <p>Fix Version</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Initiatives with Epics -->
+            <div id="initiativesContainer"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentAnalysisData = null;
+        let currentView = 'table';
+
+        function switchView(view) {
+            currentView = view;
+            document.getElementById('tableViewBtn').classList.toggle('active', view === 'table');
+            document.getElementById('kanbanViewBtn').classList.toggle('active', view === 'kanban');
+            
+            if (currentAnalysisData) {
+                displayResults(currentAnalysisData);
+            }
+        }
+
+        document.getElementById('analysisForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            // Show loading, hide results and errors
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultsContainer').style.display = 'none';
+            document.getElementById('errorContainer').innerHTML = '';
+            
+            fetch('/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.error) {
+                    showError(data.error, data.error_type);
+                } else {
+                    currentAnalysisData = data;
+                    displayResults(data);
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showError(`Network error: ${error.message}`, 'NetworkError');
+            });
+        });
+
+        function showError(message, type) {
+            const errorHtml = `
+                <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <h5><i class="fas fa-exclamation-triangle"></i> ${type || 'Error'}</h5>
+                    <p>${message}</p>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+            document.getElementById('errorContainer').innerHTML = errorHtml;
+        }
+
+        function displayResults(data) {
+            // Update summary statistics
+            document.getElementById('totalInitiatives').textContent = data.total_initiatives;
+            document.getElementById('initiativesWithEpics').textContent = data.initiatives_with_epics;
+            document.getElementById('totalEpics').textContent = data.total_epics;
+            const fixVersionText = data.fix_version + (data.excluded_statuses ? ' (filtered)' : '');
+            document.getElementById('fixVersionDisplay').textContent = fixVersionText;
+            
+            // Display initiatives
+            const container = document.getElementById('initiativesContainer');
+            container.innerHTML = '';
+            
+            if (data.results && data.results.length > 0) {
+                data.results.forEach(initiative => {
+                    if (currentView === 'table') {
+                        const initiativeCard = createInitiativeCard(initiative);
+                        container.appendChild(initiativeCard);
+                    } else {
+                        const kanbanCard = createKanbanBoard(initiative);
+                        container.appendChild(kanbanCard);
+                    }
+                });
+            } else {
+                const filterMsg = data.fix_version && data.fix_version !== 'All' 
+                    ? `with fix version "${data.fix_version}"` 
+                    : '';
+                container.innerHTML = `
+                    <div class="no-results">
+                        <i class="fas fa-inbox"></i>
+                        <h4>No Epics Found</h4>
+                        <p class="text-muted">No epics ${filterMsg} were found in the analyzed initiatives.</p>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('resultsContainer').style.display = 'block';
+        }
+
+        function createInitiativeCard(initiative) {
+            const card = document.createElement('div');
+            card.className = 'initiative-card';
+            
+            const header = `
+                <div class="initiative-header">
+                    <div>
+                        <div class="initiative-title">${initiative.initiative_key}</div>
+                        <div class="text-muted">${initiative.initiative_summary}</div>
+                    </div>
+                    <div class="epic-count-badge">
+                        ${initiative.epic_count} Epic${initiative.epic_count !== 1 ? 's' : ''}
+                    </div>
+                </div>
+            `;
+            
+            let tableHtml = `
+                <div class="table-wrapper">
+                <table class="epic-table table">
+                    <thead>
+                        <tr>
+                            <th>Epic Key</th>
+                            <th>Summary</th>
+                            <th>Status</th>
+                            <th>Magnitude</th>
+                            <th>Who asked</th>
+                            <th>CPO-APO leading</th>
+                            <th>Starting date</th>
+                            <th>Fix Versions</th>
+                            <th>What to deliver</th>
+                            <th>Comments (Platform / Impacts)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            
+            initiative.epics.forEach(epic => {
+                const statusClass = getStatusClass(epic.status);
+                const fixVersions = epic.fix_versions && epic.fix_versions.length > 0 
+                    ? epic.fix_versions.join(', ') 
+                    : '<span class="text-muted">None</span>';
+                const jiraUrl = document.getElementById('jira_url').value.trim();
+                const epicLink = jiraUrl ? `<a href="${jiraUrl}/browse/${epic.key}" target="_blank" class="epic-key">${epic.key}</a>` : `<span class="epic-key">${epic.key}</span>`;
+                const comments = epic.comments || {};
+                const combinedComments = [];
+                if (comments.platform) combinedComments.push(`Platform: ${comments.platform}`);
+                if (comments.impacts) combinedComments.push(`Impacts: ${comments.impacts}`);
+                const commentsText = combinedComments.length > 0 ? combinedComments.join(' | ') : 'N/A';
+                tableHtml += `
+                    <tr>
+                        <td>${epicLink}</td>
+                        <td class="wrap" title="${epic.summary}">${epic.summary.substring(0, 50)}${epic.summary.length > 50 ? '...' : ''}</td>
+                        <td><span class="status-badge ${statusClass}">${epic.status}</span></td>
+                        <td>${epic.complexity || '<span class="text-muted">N/A</span>'}</td>
+                        <td title="${epic.requesting_customer || 'N/A'}">${(epic.requesting_customer || 'N/A').substring(0, 30)}${(epic.requesting_customer || '').length > 30 ? '...' : ''}</td>
+                        <td>${epic.assignee || '<span class="text-muted">Unassigned</span>'}</td>
+                        <td>${epic.target_start || '<span class="text-muted">N/A</span>'}</td>
+                        <td>${fixVersions}</td>
+                        <td class="wrap" title="${epic.solution || 'N/A'}">${(epic.solution || 'N/A').substring(0, 40)}${(epic.solution || '').length > 40 ? '...' : ''}</td>
+                        <td class="wrap" title="${commentsText}">${commentsText.substring(0, 50)}${commentsText.length > 50 ? '...' : ''}</td>
+                    </tr>
+                `;
+            });
+            
+            tableHtml += `
+                    </tbody>
+                </table>
+                </div>
+            `;
+            
+            card.innerHTML = header + tableHtml;
+            return card;
+        }
+
+        function getStatusClass(status) {
+            const statusLower = status.toLowerCase();
+            if (statusLower.includes('done') || statusLower.includes('closed') || statusLower.includes('resolved')) {
+                return 'status-done';
+            } else if (statusLower.includes('progress') || statusLower.includes('doing') || statusLower.includes('development')) {
+                return 'status-progress';
+            } else {
+                return 'status-todo';
+            }
+        }
+
+        function createKanbanBoard(initiative) {
+            const card = document.createElement('div');
+            card.className = 'initiative-card';
+            
+            const header = `
+                <div class="initiative-header">
+                    <div>
+                        <div class="initiative-title">${initiative.initiative_key}</div>
+                        <div class="text-muted">${initiative.initiative_summary}</div>
+                    </div>
+                    <div class="epic-count-badge">
+                        ${initiative.epic_count} Epic${initiative.epic_count !== 1 ? 's' : ''}
+                    </div>
+                </div>
+            `;
+            
+            // Categorize epics by status
+            const columns = {
+                'todo': [],
+                'doing': [],
+                'waiting': [],
+                'done': []
+            };
+            
+            initiative.epics.forEach(epic => {
+                const statusLower = epic.status.toLowerCase();
+                if (statusLower.includes('done') || statusLower.includes('closed') || statusLower.includes('resolved')) {
+                    columns.done.push(epic);
+                } else if (statusLower.includes('progress') || statusLower.includes('doing') || statusLower.includes('development') || statusLower.includes('in progress')) {
+                    columns.doing.push(epic);
+                } else if (statusLower.includes('wait') || statusLower.includes('blocked') || statusLower.includes('hold')) {
+                    columns.waiting.push(epic);
+                } else {
+                    columns.todo.push(epic);
+                }
+            });
+            
+            const jiraUrl = document.getElementById('jira_url').value.trim();
+            
+            let kanbanHtml = `
+                <div class="kanban-board active">
+                    <div class="kanban-column">
+                        <div class="kanban-column-header todo">To Do (${columns.todo.length})</div>
+                        ${columns.todo.map(epic => createKanbanCard(epic, jiraUrl)).join('')}
+                    </div>
+                    <div class="kanban-column">
+                        <div class="kanban-column-header doing">Doing (${columns.doing.length})</div>
+                        ${columns.doing.map(epic => createKanbanCard(epic, jiraUrl)).join('')}
+                    </div>
+                    <div class="kanban-column">
+                        <div class="kanban-column-header waiting">Waiting (${columns.waiting.length})</div>
+                        ${columns.waiting.map(epic => createKanbanCard(epic, jiraUrl)).join('')}
+                    </div>
+                    <div class="kanban-column">
+                        <div class="kanban-column-header done">Done (${columns.done.length})</div>
+                        ${columns.done.map(epic => createKanbanCard(epic, jiraUrl)).join('')}
+                    </div>
+                </div>
+            `;
+            
+            card.innerHTML = header + kanbanHtml;
+            return card;
+        }
+
+        function createKanbanCard(epic, jiraUrl) {
+            const epicLink = jiraUrl ? `${jiraUrl}/browse/${epic.key}` : '#';
+            return `
+                <div class="kanban-card" onclick="window.open('${epicLink}', '_blank')">
+                    <div class="kanban-card-id">
+                        <i class="fas fa-link"></i> ${epic.key}
+                    </div>
+                    <div class="kanban-card-title">${epic.summary}</div>
+                    <div class="kanban-card-assignee">
+                        <i class="fas fa-user"></i> ${epic.assignee || 'Unassigned'}
+                    </div>
+                </div>
+            `;
+        }
+
+        // PDF Export
+        document.getElementById('exportPdfBtn').addEventListener('click', function() {
+            if (!currentAnalysisData) {
+                alert('No analysis data available. Please run an analysis first.');
+                return;
+            }
+
+            // Show loading state
+            const btn = this;
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating PDF...';
+
+            // Get Jira URL from form
+            const jiraUrl = document.getElementById('jira_url').value.trim();
+
+            fetch('/export_pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    analysis_data: currentAnalysisData,
+                    jira_url: jiraUrl
+                })
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('PDF generation failed');
+            })
+            .then(blob => {
+                // Create download link
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `epic_distribution_${new Date().toISOString().slice(0,10)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                
+                // Reset button
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            })
+            .catch(error => {
+                alert(`PDF generation error: ${error.message}`);
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+        });
+    </script>
+</body>
+</html>

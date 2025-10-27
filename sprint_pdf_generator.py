@@ -87,6 +87,9 @@ class SprintPDFReportGenerator:
         # Executive Summary
         self._add_summary(story, results)
         
+        # Date Forecast
+        self._add_date_forecast(story, results)
+        
         # Metrics
         self._add_metrics(story, results)
         
@@ -169,18 +172,20 @@ class SprintPDFReportGenerator:
         story.append(Paragraph(f"Completion Rate: {historical.get('completion_rate', 0):.0f}%", self.styles['Normal']))
         story.append(Paragraph(f"Historical Issues: {historical.get('total_historical_issues', 0)}", self.styles['Normal']))
         
+        # Sprint pattern and count information
+        sprint_pattern = historical.get('sprint_pattern_used', '')
+        similar_count = historical.get('similar_sprints_count', 0)
+        if sprint_pattern and similar_count > 0:
+            story.append(Paragraph(f"Sprint Pattern Filter: {sprint_pattern} ({similar_count} similar sprints found)", self.styles['Normal']))
+        elif historical.get('total_historical_issues', 0) > 0:
+            story.append(Paragraph(f"No similar sprint pattern found - using all {historical.get('total_historical_issues', 0)} historical issues", self.styles['Normal']))
+        
         # Monte Carlo results from velocity_percentiles
         velocity_percentiles = historical.get('velocity_percentiles', {})
         if velocity_percentiles:
             story.append(Spacer(1, 10))
             story.append(Paragraph("Monte Carlo Results:", self.styles['Normal']))
             story.append(Paragraph(f"P10: {velocity_percentiles.get('p10', 0):.1f}, P50: {velocity_percentiles.get('p50', 0):.1f}, P90: {velocity_percentiles.get('p90', 0):.1f}", self.styles['SprintCode']))
-        
-        # Weekly velocity data from detailed_logs
-        if detailed_logs and 'weekly_velocities' in detailed_logs and detailed_logs['weekly_velocities'] != "[Data captured during analysis]":
-            story.append(Spacer(1, 10))
-            story.append(Paragraph("Weekly Story Completion Data:", self.styles['Normal']))
-            story.append(Paragraph(f"{detailed_logs['weekly_velocities']}", self.styles['SprintCode']))
         
         story.append(Spacer(1, 20))
     
@@ -202,6 +207,59 @@ class SprintPDFReportGenerator:
             if 'remaining_stories' in details:
                 story.append(Paragraph(f"Remaining stories: {details['remaining_stories']}", self.styles['SprintCode']))
         
+        story.append(Spacer(1, 20))
+    
+    def _add_date_forecast(self, story, results):
+        """Add date forecast section."""
+        forecast_details = results.get('forecast_details', {})
+        date_forecast = forecast_details.get('date_forecast', {})
+        
+        if not date_forecast:
+            return
+        
+        story.append(Paragraph("Sprint Timeline Forecast", self.styles['SprintSection']))
+        
+        from datetime import datetime
+        
+        # Handle missing dates gracefully
+        planned_end = 'Not Available'
+        estimated_completion = 'Not Available'
+        
+        if date_forecast.get('planned_end_date'):
+            planned_end = datetime.fromisoformat(date_forecast['planned_end_date']).strftime('%Y-%m-%d')
+        
+        if date_forecast.get('estimated_completion_date'):
+            estimated_completion = datetime.fromisoformat(date_forecast['estimated_completion_date']).strftime('%Y-%m-%d')
+        
+        # Determine status message
+        if not date_forecast.get('planned_end_date'):
+            timeline_status = 'No Sprint End Date Found'
+            status_note = 'Cannot compare dates - sprint end date not found in Jira'
+        elif date_forecast.get('will_finish_on_time', True):
+            timeline_status = 'On Track'
+            days_diff = date_forecast.get('days_difference', 0)
+            status_note = 'Exactly on time' if days_diff == 0 else f'{abs(days_diff)} days early'
+        else:
+            timeline_status = 'Behind Schedule'
+            status_note = f"{date_forecast.get('missing_days', 0)} days behind"
+        
+        data = [
+            ['Planned End Date', planned_end],
+            ['Estimated Completion', estimated_completion],
+            ['Timeline Status', timeline_status],
+            ['Status Details', status_note],
+            ['Date Risk Level', date_forecast.get('date_risk_level', 'LOW')]
+        ]
+        
+        table = Table(data, colWidths=[2*inch, 2.5*inch])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.lightgrey),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        story.append(table)
         story.append(Spacer(1, 20))
     
     def _add_recommendations(self, story, results):

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Jira API Tester</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, textarea { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; }
+        button { background: #007cba; color: white; padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #005a87; }
+        .results { margin-top: 20px; }
+        .response-box { background: #f5f5f5; border: 1px solid #ddd; padding: 15px; border-radius: 4px; margin-top: 10px; }
+        .status-200 { border-left: 5px solid #28a745; }
+        .status-error { border-left: 5px solid #dc3545; }
+        pre { white-space: pre-wrap; word-wrap: break-word; max-height: 400px; overflow-y: auto; }
+        .params-container { display: flex; gap: 10px; align-items: end; }
+        .param-input { flex: 1; }
+        .add-param { background: #28a745; padding: 5px 10px; }
+        .remove-param { background: #dc3545; padding: 5px 10px; margin-left: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Jira API Tester</h1>
+        
+        <form id="apiForm">
+            <div class="form-group">
+                <label>Jira Base URL:</label>
+                <input type="text" id="baseUrl" placeholder="https://your-jira.com" value="https://your-company.atlassian.net">
+            </div>
+            
+            <div class="form-group">
+                <label>API Endpoint:</label>
+                <input type="text" id="endpoint" placeholder="/rest/agile/1.0/board" value="/rest/agile/1.0/board">
+            </div>
+            
+            <div class="form-group">
+                <label>API Token:</label>
+                <input type="password" id="token" placeholder="Your Jira API token">
+            </div>
+            
+            <div class="form-group">
+                <label>Parameters:</label>
+                <div id="paramsContainer">
+                    <div class="params-container">
+                        <input type="text" class="param-input" placeholder="Parameter name" data-type="key">
+                        <input type="text" class="param-input" placeholder="Parameter value" data-type="value">
+                        <button type="button" class="add-param" onclick="addParam()">+</button>
+                    </div>
+                </div>
+            </div>
+            
+            <button type="submit">🚀 Test API Call</button>
+        </form>
+        
+        <div id="results" class="results" style="display: none;">
+            <h2>📡 API Response</h2>
+            <div id="responseContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        function addParam() {
+            const container = document.getElementById('paramsContainer');
+            const div = document.createElement('div');
+            div.className = 'params-container';
+            div.innerHTML = `
+                <input type="text" class="param-input" placeholder="Parameter name" data-type="key">
+                <input type="text" class="param-input" placeholder="Parameter value" data-type="value">
+                <button type="button" class="add-param" onclick="addParam()">+</button>
+                <button type="button" class="remove-param" onclick="removeParam(this)">-</button>
+            `;
+            container.appendChild(div);
+        }
+        
+        function removeParam(button) {
+            button.parentElement.remove();
+        }
+        
+        function getParams() {
+            const params = {};
+            const containers = document.querySelectorAll('.params-container');
+            
+            containers.forEach(container => {
+                const keyInput = container.querySelector('[data-type="key"]');
+                const valueInput = container.querySelector('[data-type="value"]');
+                
+                if (keyInput.value && valueInput.value) {
+                    params[keyInput.value] = valueInput.value;
+                }
+            });
+            
+            return params;
+        }
+        
+        document.getElementById('apiForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const baseUrl = document.getElementById('baseUrl').value;
+            const endpoint = document.getElementById('endpoint').value;
+            const token = document.getElementById('token').value;
+            const params = getParams();
+            
+            if (!baseUrl || !endpoint || !token) {
+                alert('Please fill in all required fields');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/test_api', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        base_url: baseUrl,
+                        endpoint: endpoint,
+                        token: token,
+                        params: params
+                    })
+                });
+                
+                const result = await response.json();
+                displayResults(result);
+                
+            } catch (error) {
+                displayResults({error: error.message});
+            }
+        });
+        
+        function displayResults(result) {
+            const resultsDiv = document.getElementById('results');
+            const container = document.getElementById('responseContainer');
+            
+            let html = '';
+            
+            if (result.error) {
+                html = `<div class="response-box status-error">
+                    <h3>❌ Error</h3>
+                    <pre>${result.error}</pre>
+                </div>`;
+            } else {
+                const statusClass = result.status_code === 200 ? 'status-200' : 'status-error';
+                
+                html = `
+                    <div class="response-box ${statusClass}">
+                        <h3>📍 Request Details</h3>
+                        <p><strong>URL:</strong> ${result.url}</p>
+                        <p><strong>Parameters:</strong> ${JSON.stringify(result.params, null, 2)}</p>
+                        <p><strong>Status Code:</strong> ${result.status_code}</p>
+                    </div>
+                    
+                    <div class="response-box">
+                        <h3>📦 Response Headers</h3>
+                        <pre>${JSON.stringify(result.headers, null, 2)}</pre>
+                    </div>
+                    
+                    <div class="response-box">
+                        <h3>📄 Response Body</h3>
+                        <pre>${result.response_json ? JSON.stringify(result.response_json, null, 2) : result.response_text}</pre>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+            resultsDiv.style.display = 'block';
+        }
+        
+        // Add some common API examples
+        const examples = [
+            {
+                name: "Get Boards",
+                endpoint: "/rest/agile/1.0/board",
+                params: {"maxResults": "50"}
+            },
+            {
+                name: "Get Sprint by ID",
+                endpoint: "/rest/agile/1.0/sprint/12345",
+                params: {}
+            },
+            {
+                name: "Get Board Sprints",
+                endpoint: "/rest/agile/1.0/board/123/sprint",
+                params: {"maxResults": "100"}
+            }
+        ];
+        
+        // Add examples buttons
+        const form = document.getElementById('apiForm');
+        const examplesDiv = document.createElement('div');
+        examplesDiv.innerHTML = '<h3>📋 Quick Examples:</h3>';
+        
+        examples.forEach(example => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.textContent = example.name;
+            button.style.marginRight = '10px';
+            button.style.marginBottom = '10px';
+            button.onclick = () => {
+                document.getElementById('endpoint').value = example.endpoint;
+                // Clear existing params
+                document.getElementById('paramsContainer').innerHTML = '';
+                // Add example params
+                Object.entries(example.params).forEach(([key, value], index) => {
+                    if (index === 0) {
+                        addParam();
+                    } else {
+                        addParam();
+                    }
+                    const containers = document.querySelectorAll('.params-container');
+                    const lastContainer = containers[containers.length - 1];
+                    lastContainer.querySelector('[data-type="key"]').value = key;
+                    lastContainer.querySelector('[data-type="value"]').value = value;
+                });
+                if (Object.keys(example.params).length === 0) {
+                    addParam();
+                }
+            };
+            examplesDiv.appendChild(button);
+        });
+        
+        form.appendChild(examplesDiv);
+    </script>
+</body>
+</html>

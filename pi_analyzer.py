@@ -15,6 +15,7 @@ import os
 
 # Reuse existing classes
 from jira_client import JiraClient
+from pi_cache import PICache
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -36,7 +37,37 @@ class PIAnalyzer:
             jira_client (JiraClient): Configured Jira client instance
         """
         self.jira_client = jira_client
+        self.cache = PICache(cache_ttl_minutes=30)  # 30-minute cache
+        
+        # Keep original working timeout settings for PI analysis
+        # Don't override what was working before
+        
         self._load_configuration()
+    
+    def _fetch_issues_with_cache(self, jql_query: str, max_results: int = 5000) -> List[Dict]:
+        """
+        Fetch issues with caching to avoid redundant queries.
+        
+        Args:
+            jql_query (str): JQL query string
+            max_results (int): Maximum results to fetch
+            
+        Returns:
+            List[Dict]: List of issues (from cache or fresh fetch)
+        """
+        # Try to get from cache first
+        cached_issues = self.cache.get_cached_issues(jql_query, max_results)
+        if cached_issues is not None:
+            return cached_issues
+        
+        # Cache miss - fetch from Jira
+        logger.info(f"🔄 Fetching fresh data from Jira...")
+        issues = self.jira_client.fetch_issues(jql_query, max_results)
+        
+        # Cache the results
+        self.cache.cache_issues(jql_query, issues, max_results)
+        
+        return issues
     
     def _load_configuration(self):
         """
@@ -77,6 +108,37 @@ class PIAnalyzer:
         
         # Display detailed configuration
         self._display_configuration()
+    
+    def _load_timeout_configuration(self) -> Dict:
+        """
+        Load timeout configuration from timeout_config.json file.
+        
+        Returns:
+            Dict: Timeout configuration parameters
+        """
+        config_path = os.path.join(os.path.dirname(__file__), 'timeout_config.json')
+        
+        # Default timeout settings
+        default_settings = {
+            "connect_timeout": 20,
+            "read_timeout": 120,
+            "batch_size": 100,
+            "min_batch_size": 25
+        }
+        
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                timeout_settings = config.get('timeout_settings', default_settings)
+                logger.info(f"⚙️ Loaded timeout configuration: connect={timeout_settings.get('connect_timeout')}s, read={timeout_settings.get('read_timeout')}s, batch={timeout_settings.get('batch_size')}")
+                return timeout_settings
+            else:
+                logger.info("⚙️ Using default timeout configuration")
+                return default_settings
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to load timeout config, using defaults: {str(e)}")
+            return default_settings
     
     def _display_configuration(self):
         """
@@ -144,6 +206,10 @@ class PIAnalyzer:
         logger.info(f"🎯 Target Project: {self.base_project}")
         logger.info(f"🔍 Analysis Type: {'Full Backlog + Flow Metrics' if include_full_backlog else 'Completion Metrics Only'}")
         logger.info(f"🚫 Excluded Projects: {', '.join(sorted(self.excluded_projects)) if self.excluded_projects else 'None'}")
+        
+        # Display cache stats
+        cache_stats = self.cache.get_cache_stats()
+        logger.info(f"🗄️ Cache Status: {cache_stats['total_entries']} queries cached, {cache_stats['total_cached_issues']} issues")
         logger.info("="*60 + "\n")
         
         # Step 1: Discover related projects
@@ -167,6 +233,9 @@ class PIAnalyzer:
         # Step 5: Create comprehensive report
         report = self._create_pi_report(pi_start_date, pi_end_date, related_projects, metrics, flow_metrics)
         
+        # Final cache statistics
+        final_cache_stats = self.cache.get_cache_stats()
+        logger.info(f"\n🗄️ Final Cache Stats: {final_cache_stats['total_entries']} queries cached, {final_cache_stats['total_cached_issues']} total issues")
         logger.info("✅ PI analysis completed successfully")
         return report
     
@@ -199,7 +268,7 @@ class PIAnalyzer:
             jql_query = f'key = "{test_id}"'
             
             try:
-                initiatives = self.jira_client.fetch_issues(jql_query, max_results=1)
+                initiatives = self._fetch_issues_with_cache(jql_query, max_results=1)
                 logger.info(f"📊 Test mode: Found {len(initiatives)} initiative(s)")
                 return initiatives
             except Exception as e:
@@ -211,7 +280,7 @@ class PIAnalyzer:
             jql_query = 'project = ISDOP AND issuetype = "Business Initiative"'
             
             try:
-                initiatives = self.jira_client.fetch_issues(jql_query, max_results=500)
+                initiatives = self._fetch_issues_with_cache(jql_query, max_results=500)
                 logger.info(f"📊 Found {len(initiatives)} business initiatives")
                 return initiatives
                 
@@ -278,40 +347,35 @@ class PIAnalyzer:
             List[Dict]: List of completed child issues
         """
         status_list = ','.join([f'"{status}"' for status in self.completion_statuses])
+        issue_type_list = ','.join([f'"{issue_type}"' for issue_type in self.issue_types])
         
         jql_query = (f'issuekey in childIssuesOf("{initiative_key}") '
                     f'AND resolved >= "{start_date}" '
                     f'AND resolved <= "{end_date}" '
-                    f'AND status IN ({status_list})')
+                    f'AND status IN ({status_list}) '
+                    f'AND issuetype IN ({issue_type_list})')
         
         logger.debug(f"🔍 Initiative JQL: {jql_query}")
         
         try:
+            # Fetch all issues at once using cache
+            raw_issues = self._fetch_issues_with_cache(jql_query, max_results=1000)
+            
+            if not raw_issues:
+                return []
+            
+            # Enhance issues with estimate data (with progress logging)
+            logger.info(f"🔧 Enhancing {len(raw_issues)} issues with estimate data for {initiative_key}...")
             issues = []
-            start_at = 0
-            chunk_size = 100
+            for i, issue in enumerate(raw_issues, 1):
+                if i % 10 == 0:  # Log every 10 issues
+                    logger.info(f"   📊 Enhanced {i}/{len(raw_issues)} issues")
+                
+                enhanced_issue = self._enhance_issue_with_estimates(issue)
+                if enhanced_issue:
+                    issues.append(enhanced_issue)
             
-            while True:
-                chunk_issues = self.jira_client.fetch_issues(
-                    jql_query, 
-                    max_results=chunk_size, 
-                    start_at=start_at
-                )
-                
-                if not chunk_issues:
-                    break
-                
-                # Enhance issues with estimate data
-                for issue in chunk_issues:
-                    enhanced_issue = self._enhance_issue_with_estimates(issue)
-                    if enhanced_issue:
-                        issues.append(enhanced_issue)
-                
-                start_at += len(chunk_issues)
-                
-                if len(chunk_issues) < chunk_size:
-                    break
-            
+            logger.info(f"✅ Enhanced {len(issues)} issues successfully")
             return issues
             
         except Exception as e:
@@ -330,38 +394,33 @@ class PIAnalyzer:
             List[Dict]: List of completed ISDOP issues
         """
         status_list = ','.join([f'"{status}"' for status in self.completion_statuses])
+        issue_type_list = ','.join([f'"{issue_type}"' for issue_type in self.issue_types])
         
         jql_query = (f'project = {self.base_project} '
                     f'AND resolved >= "{start_date}" '
                     f'AND resolved <= "{end_date}" '
-                    f'AND status IN ({status_list})')
+                    f'AND status IN ({status_list}) '
+                    f'AND issuetype IN ({issue_type_list})')
         
         try:
+            # Fetch all issues at once using cache
+            raw_issues = self._fetch_issues_with_cache(jql_query, max_results=1000)
+            
+            if not raw_issues:
+                return []
+            
+            # Enhance issues with estimate data (with progress logging)
+            logger.info(f"🔧 Enhancing {len(raw_issues)} direct {self.base_project} issues with estimate data...")
             issues = []
-            start_at = 0
-            chunk_size = 100
+            for i, issue in enumerate(raw_issues, 1):
+                if i % 10 == 0:  # Log every 10 issues
+                    logger.info(f"   📊 Enhanced {i}/{len(raw_issues)} issues")
+                
+                enhanced_issue = self._enhance_issue_with_estimates(issue)
+                if enhanced_issue:
+                    issues.append(enhanced_issue)
             
-            while True:
-                chunk_issues = self.jira_client.fetch_issues(
-                    jql_query, 
-                    max_results=chunk_size, 
-                    start_at=start_at
-                )
-                
-                if not chunk_issues:
-                    break
-                
-                # Enhance issues with estimate data
-                for issue in chunk_issues:
-                    enhanced_issue = self._enhance_issue_with_estimates(issue)
-                    if enhanced_issue:
-                        issues.append(enhanced_issue)
-                
-                start_at += len(chunk_issues)
-                
-                if len(chunk_issues) < chunk_size:
-                    break
-            
+            logger.info(f"✅ Enhanced {len(issues)} issues successfully")
             return issues
             
         except Exception as e:
@@ -379,7 +438,7 @@ class PIAnalyzer:
             Optional[Dict]: Enhanced issue with estimate data
         """
         try:
-            # Fetch detailed issue data
+            # Fetch detailed issue data with original timeout
             response = self.jira_client.session.get(
                 f"{self.jira_client.base_url}/rest/api/2/issue/{issue['key']}",
                 params={'fields': 'timeoriginalestimate,issuetype,project,resolution,resolutiondate'}
@@ -534,25 +593,28 @@ class PIAnalyzer:
             List[Dict]: All relevant issues
         """
         # Get completed issues
+        issue_type_list = ','.join([f'"{issue_type}"' for issue_type in self.issue_types])
         completed_jql = (f'project = {project} '
                         f'AND resolved >= "{start_date}" '
-                        f'AND resolved <= "{end_date}"')
+                        f'AND resolved <= "{end_date}" '
+                        f'AND issuetype IN ({issue_type_list})')
         
         # Get in-progress issues
         in_progress_statuses = ','.join([f'"{status}"' for status in self.in_progress_statuses])
         wip_jql = (f'project = {project} '
                   f'AND status IN ({in_progress_statuses}) '
-                  f'AND created <= "{end_date}"')
+                  ### f'AND created <= "{end_date}" '
+                  f'AND issuetype IN ({issue_type_list})')
         
         all_issues = []
         
         try:
             # Fetch completed issues
-            completed_issues = self.jira_client.fetch_issues(completed_jql, max_results=1000)
+            completed_issues = self._fetch_issues_with_cache(completed_jql, max_results=1000)
             all_issues.extend(completed_issues)
             
             # Fetch WIP issues
-            wip_issues = self.jira_client.fetch_issues(wip_jql, max_results=1000)
+            wip_issues = self._fetch_issues_with_cache(wip_jql, max_results=1000)
             all_issues.extend(wip_issues)
             
             # Enhance with detailed data

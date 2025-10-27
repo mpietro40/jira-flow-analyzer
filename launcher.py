@@ -45,7 +45,11 @@ def print_menu():
     print("   └─ Epic estimate management")
     print("   └─ Port: 5100 (shares with Lead Time)")
     print()
-    print("6. 🎯 Generate Presentation Only")
+    print("6. 🔍 Duplicate Story Detector (Individual)")
+    print("   └─ Identify potential duplicate stories")
+    print("   └─ Port: 5400")
+    print()
+    print("7. 🎯 Generate Presentation Only")
     print("   └─ Create PDF presentation without web interface")
     print()
     print("0. ❌ Exit")
@@ -88,7 +92,7 @@ def main():
         print_menu()
         
         try:
-            choice = input("Enter your choice (0-6): ").strip()
+            choice = input("Enter your choice (0-7): ").strip()
             
             if choice == "0":
                 print("👋 Goodbye!")
@@ -98,7 +102,7 @@ def main():
                 run_application("main_app.py", "Unified Jira Analytics Suite", 5000)
                 
             elif choice == "2":
-                run_application("app.py", "Lead Time Analyzer", 5100)
+                run_application("lead_time_analyzer.py", "Lead Time Analyzer", 5100)
                 
             elif choice == "3":
                 run_application("pi_web_app.py", "PI Analyzer", 5300)
@@ -109,14 +113,17 @@ def main():
             elif choice == "5":
                 print("ℹ️  Epic Analyzer uses the same interface as Lead Time Analyzer")
                 print("   Navigate to the Epic Analysis section once the app loads.")
-                run_application("app.py", "Epic Analyzer (via Lead Time App)", 5100)
+                run_application("lead_time_analyzer.py", "Epic Analyzer (via Lead Time App)", 5100)
                 
             elif choice == "6":
+                run_application("duplicate_web_app.py", "Duplicate Story Detector", 5400)
+                
+            elif choice == "7":
                 generate_presentation()
                 input("Press Enter to continue...")
                 
             else:
-                print("❌ Invalid choice. Please enter a number between 0-6.")
+                print("❌ Invalid choice. Please enter a number between 0-7.")
                 input("Press Enter to continue...")
                 
         except KeyboardInterrupt:
@@ -133,4 +140,9 @@ if __name__ == "__main__":
         print("Current directory:", os.getcwd())
         sys.exit(1)
     
-    main()
+    # Auto-start unified suite in Docker environment
+    if os.environ.get('PORT') or os.path.exists('/.dockerenv'):
+        logger.info("🐳 Docker environment detected - starting Unified Suite automatically")
+        run_application("main_app.py", "Unified Jira Analytics Suite", 5000)
+    else:
+        main()
