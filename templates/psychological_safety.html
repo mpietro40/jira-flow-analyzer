@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira-Based Psychological Safety Indicators</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary-color: #4CAF50;
+            --secondary-color: #2196F3;
+            --warning-color: #FF9800;
+            --danger-color: #F44336;
+            --success-color: #8BC34A;
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 2rem 0;
+            margin-bottom: 2rem;
+        }
+
+        .metric-card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            margin-bottom: 1rem;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .metric-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .trend-up {
+            color: var(--success-color);
+        }
+
+        .trend-down {
+            color: var(--danger-color);
+        }
+
+        .trend-neutral {
+            color: #666;
+        }
+
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+        }
+
+        .info-tooltip {
+            cursor: help;
+            color: var(--secondary-color);
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="text-center">
+            <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <div class="mt-3">
+                <h5>Analyzing Psychological Safety Indicators...</h5>
+                <p class="text-muted">This may take a few minutes</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="container">
+            <h1 class="display-4">
+                <i class="fas fa-heart me-3"></i>
+                Psychological Safety Indicators
+            </h1>
+            <p class="lead">Measure team psychological safety through Jira interactions</p>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Cache Management -->
+        <div class="row mb-3">
+            <div class="col-12">
+                <button id="clearCacheBtn" class="btn btn-outline-secondary btn-sm">
+                    <i class="fas fa-trash"></i> Clear Cache
+                </button>
+                <small class="text-muted ms-2">Clear cached Jira data to force fresh analysis</small>
+            </div>
+        </div>
+        
+        <!-- Analysis Form -->
+        <div class="row mb-4">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h4><i class="fas fa-search me-2"></i>Weekly Safety Analysis</h4>
+                    </div>
+                    <div class="card-body">
+                        <form id="safetyAnalysisForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="jira_url" class="form-label">
+                                            <i class="fas fa-link me-2"></i>Jira URL
+                                        </label>
+                                        <input type="url" class="form-control" id="jira_url" name="jira_url" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="access_token" class="form-label">
+                                            <i class="fas fa-key me-2"></i>Access Token
+                                        </label>
+                                        <input type="password" class="form-control" id="access_token" name="access_token" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label for="jql_query" class="form-label">
+                                            <i class="fas fa-code me-2"></i>JQL Query
+                                        </label>
+                                        <textarea class="form-control" id="jql_query" name="jql_query" rows="2" required 
+                                                  placeholder="project = PROJ AND type = Initiative"></textarea>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="week_year" class="form-label">
+                                            <i class="fas fa-calendar me-2"></i>Week (Optional)
+                                        </label>
+                                        <input type="text" class="form-control" id="week_year" name="week_year" 
+                                               placeholder="2024-15">
+                                        <div class="form-text">Leave empty for current week</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-chart-line me-2"></i>Analyze Safety
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h4><i class="fas fa-chart-bar me-2"></i>Historical Trends</h4>
+                    </div>
+                    <div class="card-body">
+                        <form id="trendsForm">
+                            <div class="mb-3">
+                                <label for="weeks_back" class="form-label">Weeks to Analyze</label>
+                                <select class="form-control" id="weeks_back" name="weeks_back">
+                                    <option value="4">Last 4 weeks</option>
+                                    <option value="8">Last 8 weeks</option>
+                                    <option value="12" selected>Last 12 weeks</option>
+                                    <option value="24">Last 24 weeks</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="btn btn-secondary w-100">
+                                <i class="fas fa-history me-2"></i>View Trends
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="resultsSection" style="display: none;">
+            <!-- Current Week Metrics -->
+            <div class="row mb-4" id="currentMetrics">
+                <div class="col-md-3">
+                    <div class="card metric-card text-center">
+                        <div class="card-body">
+                            <i class="fas fa-comments metric-icon" style="color: var(--primary-color);"></i>
+                            <div class="metric-value" id="participationRate">0%</div>
+                            <div class="metric-label">
+                                Comment Participation
+                                <i class="fas fa-info-circle info-tooltip ms-1" 
+                                   title="Percentage of team members who added comments this week"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card metric-card text-center">
+                        <div class="card-body">
+                            <i class="fas fa-question-circle metric-icon" style="color: var(--secondary-color);"></i>
+                            <div class="metric-value" id="questionFrequency">0%</div>
+                            <div class="metric-label">
+                                Question Frequency
+                                <i class="fas fa-info-circle info-tooltip ms-1" 
+                                   title="Percentage of comments containing questions or curiosity"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card metric-card text-center">
+                        <div class="card-body">
+                            <i class="fas fa-balance-scale metric-icon" style="color: var(--warning-color);"></i>
+                            <div class="metric-value" id="disagreementRate">0%</div>
+                            <div class="metric-label">
+                                Healthy Disagreement
+                                <i class="fas fa-info-circle info-tooltip ms-1" 
+                                   title="Percentage of comments showing respectful disagreement"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card metric-card text-center">
+                        <div class="card-body">
+                            <i class="fas fa-hands-helping metric-icon" style="color: var(--success-color);"></i>
+                            <div class="metric-value" id="helpSeeking">0</div>
+                            <div class="metric-label">
+                                Help-Seeking Issues
+                                <i class="fas fa-info-circle info-tooltip ms-1" 
+                                   title="Number of issues tagged with help-needed or guidance"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Metrics -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-lightbulb me-2"></i>Idea Contribution</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h3 id="ideaContributors">0</h3>
+                                    <small class="text-muted">Team members creating issues</small>
+                                </div>
+                                <i class="fas fa-lightbulb fa-3x" style="color: var(--warning-color);"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5><i class="fas fa-users me-2"></i>Team Engagement</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <h3><span id="commentingMembers">0</span>/<span id="totalMembers">0</span></h3>
+                                    <small class="text-muted">Active vs Total members</small>
+                                </div>
+                                <i class="fas fa-users fa-3x" style="color: var(--secondary-color);"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trends Chart -->
+            <div class="card mb-4" id="trendsSection" style="display: none;">
+                <div class="card-header">
+                    <h5><i class="fas fa-chart-line me-2"></i>Safety Trends</h5>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="trendsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Team Details -->
+            <div class="card">
+                <div class="card-header">
+                    <h5><i class="fas fa-info-circle me-2"></i>Analysis Details</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>Week Analyzed</h6>
+                            <p id="weekAnalyzed" class="text-muted">-</p>
+                            
+                            <h6>Total Comments</h6>
+                            <p id="totalComments" class="text-muted">-</p>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Total Issues</h6>
+                            <p id="totalIssues" class="text-muted">-</p>
+                            
+                            <h6>Analysis Date</h6>
+                            <p id="analysisDate" class="text-muted">-</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Error Section -->
+        <div class="alert alert-danger" id="errorSection" style="display: none;">
+            <h5><i class="fas fa-exclamation-triangle me-2"></i>Error</h5>
+            <p id="errorMessage"></p>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let trendsChart = null;
+
+        function showLoading() {
+            document.getElementById('loadingOverlay').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loadingOverlay').style.display = 'none';
+        }
+
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            document.getElementById('errorSection').style.display = 'block';
+            document.getElementById('resultsSection').style.display = 'none';
+        }
+
+        function hideError() {
+            document.getElementById('errorSection').style.display = 'none';
+        }
+
+        // Safety Analysis Form
+        document.getElementById('safetyAnalysisForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            showLoading();
+            hideError();
+
+            const formData = new FormData(e.target);
+
+            try {
+                const response = await fetch('/analyze_safety', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayResults(data.analysis_results);
+                } else {
+                    showError(data.error || 'Analysis failed');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Trends Form
+        document.getElementById('trendsForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const jiraUrl = document.getElementById('jira_url').value;
+            const accessToken = document.getElementById('access_token').value;
+            
+            if (!jiraUrl || !accessToken) {
+                showError('Please fill in Jira URL and Access Token first');
+                return;
+            }
+
+            showLoading();
+            hideError();
+
+            const formData = new FormData();
+            formData.append('jira_url', jiraUrl);
+            formData.append('access_token', accessToken);
+            formData.append('weeks_back', document.getElementById('weeks_back').value);
+
+            try {
+                const response = await fetch('/get_trends', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    displayTrends(data.trends);
+                } else {
+                    showError(data.error || 'Trends analysis failed');
+                }
+            } catch (error) {
+                showError('Network error: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        function displayResults(results) {
+            const metrics = results.metrics;
+            const rawData = results.raw_data;
+
+            // Update metric cards
+            document.getElementById('participationRate').textContent = metrics.comment_participation_rate + '%';
+            document.getElementById('questionFrequency').textContent = metrics.question_frequency + '%';
+            document.getElementById('disagreementRate').textContent = metrics.disagreement_indicators + '%';
+            document.getElementById('helpSeeking').textContent = metrics.help_seeking_issues;
+            document.getElementById('ideaContributors').textContent = metrics.idea_contributors;
+            document.getElementById('commentingMembers').textContent = rawData.commenting_members;
+            document.getElementById('totalMembers').textContent = rawData.total_team_members;
+
+            // Update details
+            document.getElementById('weekAnalyzed').textContent = results.week;
+            document.getElementById('totalComments').textContent = rawData.total_comments;
+            document.getElementById('totalIssues').textContent = rawData.total_issues;
+            document.getElementById('analysisDate').textContent = new Date(results.analysis_date).toLocaleString();
+
+            document.getElementById('resultsSection').style.display = 'block';
+        }
+
+        function displayTrends(trends) {
+            const ctx = document.getElementById('trendsChart').getContext('2d');
+            
+            if (trendsChart) {
+                trendsChart.destroy();
+            }
+
+            trendsChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: trends.weeks,
+                    datasets: [
+                        {
+                            label: 'Participation Rate (%)',
+                            data: trends.participation_rates,
+                            borderColor: '#4CAF50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Question Frequency (%)',
+                            data: trends.question_frequencies,
+                            borderColor: '#2196F3',
+                            backgroundColor: 'rgba(33, 150, 243, 0.1)',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Healthy Disagreement (%)',
+                            data: trends.disagreement_rates,
+                            borderColor: '#FF9800',
+                            backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        },
+                        title: {
+                            display: true,
+                            text: `Psychological Safety Trends (${trends.total_weeks} weeks)`
+                        }
+                    }
+                }
+            });
+
+            document.getElementById('trendsSection').style.display = 'block';
+        }
+
+        // Clear cache functionality
+        document.getElementById('clearCacheBtn').addEventListener('click', function() {
+            const jiraUrl = document.getElementById('jira_url').value;
+            const accessToken = document.getElementById('access_token').value;
+            
+            if (!jiraUrl || !accessToken) {
+                alert('Please enter Jira URL and Access Token first.');
+                return;
+            }
+            
+            if (confirm('Clear cache? This will force fresh data retrieval on next analysis.')) {
+                const formData = new FormData();
+                formData.append('jira_url', jiraUrl);
+                formData.append('access_token', accessToken);
+                
+                fetch('/clear_cache', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Cache cleared successfully!');
+                    } else {
+                        alert('Failed to clear cache: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    alert('Failed to clear cache: ' + error.message);
+                });
+            }
+        });
+
+        // Initialize tooltips
+        document.addEventListener('DOMContentLoaded', function() {
+            const tooltips = document.querySelectorAll('.info-tooltip');
+            tooltips.forEach(tooltip => {
+                new bootstrap.Tooltip(tooltip);
+            });
+        });
+    </script>
+</body>
+</html>
