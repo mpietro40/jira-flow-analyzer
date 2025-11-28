@@ -55,7 +55,7 @@ class EpicFixVersionAnalyzer:
             Analysis results with epics grouped by initiative
         """
         if excluded_statuses is None:
-            excluded_statuses = ['Done', 'Closed', 'Abandoned']
+            excluded_statuses = ['Done', 'Closed', 'Abandoned', 'Cancelled', 'Resolved']
         
         logger.info(f"🚀 Starting analysis")
         if fix_version:
@@ -167,11 +167,11 @@ class EpicFixVersionAnalyzer:
                     'status': epic.get('status', 'Unknown'),
                     'project': self._extract_project_key(epic),
                     'fix_versions': fix_versions,
-                    'complexity': self._extract_custom_field(fields, 'customfield_10037'),
-                    'requesting_customer': self._extract_custom_field(fields, 'customfield_10095'),
+                    'complexity': self._extract_custom_field(fields, 'customfield_41340'),
+                    'requesting_customer': self._extract_custom_field(fields, 'customfield_114641'),
                     'assignee': epic.get('assignee', 'Unassigned'),
-                    'target_start': self._extract_custom_field(fields, 'customfield_10096'),
-                    'solution': self._extract_custom_field(fields, 'customfield_10097'),
+                    'target_start': self._extract_custom_field(fields, 'customfield_42640'),
+                    'solution': self._extract_custom_field(fields, 'customfield_116072'),
                     'comments': self._extract_comments(fields)
                 }
                 epic_list.append(epic_data)

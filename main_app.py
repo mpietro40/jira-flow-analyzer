@@ -16,6 +16,11 @@ import threading
 import time
 import requests
 
+# Configure logging early
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('JiraAnalyticsSuite')
+
 # Import all existing components
 from jira_client import JiraClient
 from data_analyzer import DataAnalyzer
@@ -25,15 +30,17 @@ from pi_analyzer import PIAnalyzer
 from pi_pdf_generator import PIPDFReportGenerator
 from sprint_analyzer import SprintAnalyzer
 from sprint_pdf_generator import SprintPDFReportGenerator
-from presentation_generator import PresentationGenerator
+try:
+    from presentation_generator import PresentationGenerator
+    PRESENTATION_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Presentation generator not available: {e}")
+    PresentationGenerator = None
+    PRESENTATION_AVAILABLE = False
 from duplicate_detector import DuplicateDetector
 from duplicate_pdf_generator import DuplicatePDFReportGenerator
 from report_generator import ReportGenerator
 from report_pdf_generator import ReportPDFGenerator
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger('JiraAnalyticsSuite')
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'jira-analytics-suite-key-change-in-production')
@@ -65,6 +72,11 @@ def sprint_analyzer():
 def epic_analyzer():
     """Epic Analyzer application."""
     return render_template('index_epic.html')
+
+@app.route('/epic-fixversion')
+def epic_fixversion():
+    """Epic Fix Version Analyzer application."""
+    return render_template('epic_fixversion.html')
 
 @app.route('/psychological-safety')
 def psychological_safety():
@@ -204,6 +216,69 @@ def analyze_epics():
         logger.error(f"Epic analysis error: {str(e)}")
         return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
 
+@app.route('/analyze_epic_fixversion', methods=['POST'])
+def analyze_epic_fixversion():
+    """Process Epic Fix Version analysis request."""
+    try:
+        jira_url = request.form.get('jira_url')
+        access_token = request.form.get('access_token')
+        initiative_jql = request.form.get('initiative_jql')
+        fix_version = request.form.get('fix_version', '').strip() or None
+        excluded_statuses_str = request.form.get('excluded_statuses', '').strip()
+        
+        if not all([jira_url, access_token, initiative_jql]):
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        # Parse excluded statuses
+        excluded_statuses = None
+        if excluded_statuses_str:
+            excluded_statuses = [s.strip() for s in excluded_statuses_str.split(',') if s.strip()]
+        
+        jira_client = JiraClient(jira_url, access_token)
+        
+        if not jira_client.test_connection():
+            return jsonify({'error': 'Failed to connect to Jira'}), 401
+        
+        from epic_fixversion_app import EpicFixVersionAnalyzer
+        analyzer = EpicFixVersionAnalyzer(jira_client)
+        results = analyzer.analyze(initiative_jql, fix_version, excluded_statuses)
+        
+        if 'error' in results:
+            return jsonify({'error': results['error']}), 404
+        
+        return jsonify(results)
+        
+    except Exception as e:
+        logger.error(f"Epic Fix Version analysis error: {str(e)}")
+        return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
+
+@app.route('/export_epic_fixversion_pdf', methods=['POST'])
+def export_epic_fixversion_pdf():
+    """Export Epic Fix Version analysis as PDF."""
+    try:
+        data = request.get_json()
+        analysis_data = data.get('analysis_data', data)
+        jira_url = data.get('jira_url', '')
+        
+        from epic_fixversion_pdf_generator import EpicFixVersionPDFGenerator
+        pdf_generator = EpicFixVersionPDFGenerator()
+        pdf_buffer = pdf_generator.generate_report(analysis_data, jira_url=jira_url)
+        
+        fix_version = analysis_data.get('fix_version', 'All').replace('/', '_').replace('\\', '_')
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f'epic_distribution_{fix_version}_{timestamp}.pdf'
+        
+        return send_file(
+            pdf_buffer,
+            mimetype='application/pdf',
+            as_attachment=True,
+            download_name=filename
+        )
+        
+    except Exception as e:
+        logger.error(f"Epic Fix Version PDF export error: {str(e)}")
+        return jsonify({'error': f'PDF export failed: {str(e)}'}), 500
+
 @app.route('/analyze_safety', methods=['POST'])
 def analyze_safety():
     """Process psychological safety analysis request."""
@@ -266,20 +341,23 @@ def get_trends():
         logger.error(f"Trends analysis error: {str(e)}")
         return jsonify({'error': f'Analysis failed: {str(e)}'}), 500
 
-@app.route('/duplicate-detector')
-def duplicate_detector():
-    """Duplicate Story Detector application."""
-    return render_template('duplicate_detector.html')
-
 @app.route('/reports')
 def reports():
     """Report Generator application."""
     return render_template('report_generator.html')
 
+@app.route('/duplicate-detector')
+def duplicate_detector():
+    """Duplicate Story Detector application."""
+    return render_template('duplicate_detector.html')
+
 @app.route('/presentation')
 def presentation():
     """Generate presentation."""
     try:
+        if not PRESENTATION_AVAILABLE or PresentationGenerator is None:
+            return jsonify({'error': 'Presentation generator is not available. Please install reportlab package.'}), 503
+            
         generator = PresentationGenerator()
         pdf_buffer = generator.generate_presentation()
         
@@ -770,8 +848,10 @@ def health_check():
             'PI Analyzer', 
             'Sprint Analyzer',
             'Epic Analyzer',
-            'Duplicate Detector',
+            'Epic Fix Version Analyzer',
+            'Psychological Safety Analyzer',
             'Report Generator',
+            'Duplicate Detector',
             'Presentation Generator'
         ]
     })

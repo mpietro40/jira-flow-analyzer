@@ -45,11 +45,15 @@ def print_menu():
     print("   └─ Epic estimate management")
     print("   └─ Port: 5100 (shares with Lead Time)")
     print()
-    print("6. 🔍 Duplicate Story Detector (Individual)")
-    print("   └─ Identify potential duplicate stories")
+    print("6. 🏷️ Epic Fix Version Analyzer (Individual)")
+    print("   └─ Analyze epics by fix version")
     print("   └─ Port: 5400")
     print()
-    print("7. 🎯 Generate Presentation Only")
+    print("7. 🔍 Duplicate Story Detector (Individual)")
+    print("   └─ Identify potential duplicate stories")
+    print("   └─ Port: 5500")
+    print()
+    print("8. 🎯 Generate Presentation Only")
     print("   └─ Create PDF presentation without web interface")
     print()
     print("0. ❌ Exit")
@@ -92,7 +96,7 @@ def main():
         print_menu()
         
         try:
-            choice = input("Enter your choice (0-7): ").strip()
+            choice = input("Enter your choice (0-8): ").strip()
             
             if choice == "0":
                 print("👋 Goodbye!")
@@ -116,14 +120,17 @@ def main():
                 run_application("lead_time_analyzer.py", "Epic Analyzer (via Lead Time App)", 5100)
                 
             elif choice == "6":
-                run_application("duplicate_web_app.py", "Duplicate Story Detector", 5400)
+                run_application("epic_fixversion_app.py", "Epic Fix Version Analyzer", 5400)
                 
             elif choice == "7":
+                run_application("duplicate_web_app.py", "Duplicate Story Detector", 5500)
+                
+            elif choice == "8":
                 generate_presentation()
                 input("Press Enter to continue...")
                 
             else:
-                print("❌ Invalid choice. Please enter a number between 0-7.")
+                print("❌ Invalid choice. Please enter a number between 0-8.")
                 input("Press Enter to continue...")
                 
         except KeyboardInterrupt:
