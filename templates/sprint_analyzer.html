@@ -142,7 +142,7 @@
                                     <div class="mb-3">
                                         <label for="completion_statuses" class="form-label">Completion Statuses</label>
                                         <input type="text" class="form-control" id="completion_statuses" name="completion_statuses" 
-                                               value="Done,Closed" required>
+                                               value="Done,Closed,'PRD Deployed',Resolved,Cancelled,Abandonned" required>
                                         <div class="form-text">Comma-separated status names</div>
                                     </div>
                                 </div>
@@ -325,19 +325,19 @@
                                 <h6><i class="fas fa-dice"></i> Monte Carlo Velocity Distribution</h6>
                                 <div class="row mb-3">
                                     <div class="col-md-4 text-center">
-                                        <div class="badge badge-success p-2">
+                                        <div class="badge bg-success p-3 fs-6">
                                             <strong>P90 (Optimistic)</strong><br>
                                             <span id="p90Velocity">0</span> stories/week
                                         </div>
                                     </div>
                                     <div class="col-md-4 text-center">
-                                        <div class="badge badge-warning p-2">
+                                        <div class="badge bg-warning text-dark p-3 fs-6">
                                             <strong>P50 (Realistic)</strong><br>
                                             <span id="p50Velocity">0</span> stories/week
                                         </div>
                                     </div>
                                     <div class="col-md-4 text-center">
-                                        <div class="badge badge-danger p-2">
+                                        <div class="badge bg-danger p-3 fs-6">
                                             <strong>P10 (Pessimistic)</strong><br>
                                             <span id="p10Velocity">0</span> stories/week
                                         </div>
@@ -347,14 +347,14 @@
                                 <!-- Additional Monte Carlo Details -->
                                 <div class="row">
                                     <div class="col-md-6">
-                                        <small class="text-muted">
+                                        <small class="text-dark">
                                             <strong>Velocity Variance:</strong> <span id="velocityVariance">0</span><br>
                                             <strong>Weekly Data Points:</strong> <span id="weeklyDataPoints">0</span> weeks<br>
                                             <strong>Estimate Accuracy:</strong> <span id="estimateAccuracyDetail">1.0</span>x (time estimates vs actual)
                                         </small>
                                     </div>
                                     <div class="col-md-6">
-                                        <small class="text-muted">
+                                        <small class="text-dark">
                                             <strong>Historical Completion Rate:</strong> <span id="completionRateDetail">0</span>% (issues reaching Done status)<br>
                                             <strong>Simulation:</strong> 10,000 iterations based on historical velocity patterns<br>
                                             <strong>Weekly Story Data:</strong> <span id="weeklyStoryData">[]</span>

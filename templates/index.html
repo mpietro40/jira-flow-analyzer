@@ -228,6 +228,16 @@
                         </div>
                     </div>
                     
+                    <!-- Projects Analyzed -->
+                    <div id="projectsSection" class="card mb-4" style="display: none;">
+                        <div class="card-header">
+                            <h4><i class="fas fa-project-diagram"></i> Projects Analyzed</h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="projectsList"></div>
+                        </div>
+                    </div>
+
                     <!-- Metrics Summary -->
                     <div id="metricsSection" class="row mb-4">
                         <!-- Metrics will be populated here -->
@@ -304,6 +314,17 @@
         });
 
         function displayResults(data) {
+            console.log('Analysis data received:', data);
+            console.log('Projects in data:', data.projects);
+            
+            // Display projects if available
+            if (data.projects && data.projects.length > 0) {
+                console.log('Displaying projects:', data.projects);
+                displayProjects(data.projects);
+            } else {
+                console.log('No projects to display');
+            }
+            
             // Display metrics
             displayMetrics(data.metrics);
             
@@ -311,6 +332,17 @@
             displayCharts(data.charts);
             
             document.getElementById('results').style.display = 'block';
+        }
+
+        function displayProjects(projects) {
+            const projectsSection = document.getElementById('projectsSection');
+            const projectsList = document.getElementById('projectsList');
+            
+            projectsList.innerHTML = '<p><strong>Jira Projects:</strong> ' + 
+                projects.map(p => `<span class="badge bg-primary me-2">${p}</span>`).join('') + 
+                '</p>';
+            
+            projectsSection.style.display = 'block';
         }
 
         function displayMetrics(metrics) {

@@ -412,7 +412,7 @@
                             <i class="fas fa-search"></i> Initiative JQL Query
                         </label>
                         <input type="text" class="form-control" id="initiative_jql" name="initiative_jql" 
-                               placeholder='project = ISDOP AND type = "Business Initiative"' required>
+                               placeholder='project = Project1 AND type = "Business Initiative"' required>
                         <small class="text-muted">JQL query to find initiatives</small>
                     </div>
                     <div class="col-md-3 mb-3">
@@ -526,7 +526,7 @@
             document.getElementById('resultsContainer').style.display = 'none';
             document.getElementById('errorContainer').innerHTML = '';
             
-            fetch('/analyze', {
+            fetch('/analyze_epic_fixversion', {
                 method: 'POST',
                 body: formData
             })
@@ -776,7 +776,7 @@
             // Get Jira URL from form
             const jiraUrl = document.getElementById('jira_url').value.trim();
 
-            fetch('/export_pdf', {
+            fetch('/export_epic_fixversion_pdf', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
