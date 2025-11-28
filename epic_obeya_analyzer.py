@@ -14,6 +14,7 @@ import base64
 from jira_client import JiraClient
 
 logger = logging.getLogger('EpicObeyaAnalyzer')
+MAX_RESULTS_LIMIT = 5000 #JQL max result
 
 class EpicObeyaAnalyzer:
     """
@@ -141,7 +142,7 @@ class EpicObeyaAnalyzer:
         jql_query = f'issuekey in childIssuesOf("{initiative_key}") AND type = Epic AND {status_exclusion}'
         
         try:
-            child_epics = self.jira_client.fetch_issues(jql_query, max_results=2000)
+            child_epics = self.jira_client.fetch_issues(jql_query, MAX_RESULTS_LIMIT)
             return child_epics
         except Exception as e:
             logger.warning(f"⚠️ Failed to fetch child epics for {initiative_key}: {str(e)}")

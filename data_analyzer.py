@@ -204,6 +204,10 @@ class DataAnalyzer:
         else:
             logger.info(f"✅ All discovered statuses were successfully mapped")
         
+        # Extract unique projects
+        projects = sorted(df_filtered['project'].unique().tolist()) if 'project' in df_filtered.columns else []
+        logger.info(f"🏢 Projects analyzed: {projects}")
+        
         return {
             'metrics': metrics,
             'distributions': distributions,
@@ -211,7 +215,8 @@ class DataAnalyzer:
             'cycle_times': cycle_times,
             'status_durations': status_durations,
             'analysis_period': f"{months_back} months",
-            'total_issues': len(df_filtered)
+            'total_issues': len(df_filtered),
+            'projects': projects
         }
     
     
@@ -274,8 +279,12 @@ class DataAnalyzer:
                         logger.warning(f"⚠️ Failed to parse transition date for {issue.get('key', 'unknown')}: {str(e)}")
                         continue
                 
+                # Extract project from issue key
+                project_key = issue.get('key', '').split('-')[0] if '-' in issue.get('key', '') else ''
+                
                 data.append({
                     'key': issue.get('key', ''),
+                    'project': project_key,
                     'summary': issue.get('summary', ''),
                     'current_status': issue.get('status', ''),
                     'issue_type': issue.get('issue_type', ''),

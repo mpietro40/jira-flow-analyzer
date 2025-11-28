@@ -100,6 +100,10 @@ class HierarchyAnalyzer:
                     'root_query': jql_query
                 }
                 
+                # Ensure projects are included in results
+                if 'projects' not in results:
+                    results['projects'] = []
+                
                 # Mark as completed
                 state['step'] = 3
                 state['status'] = 'completed'

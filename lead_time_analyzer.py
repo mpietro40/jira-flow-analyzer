@@ -70,6 +70,9 @@ def analyze():
             # Generate visualizations
             charts = viz_generator.generate_all_charts(analysis_results)
             
+            projects = analysis_results.get('projects', [])
+            logger.info(f"📤 Sending {len(projects)} projects to frontend: {projects}")
+            
             return jsonify({
                 'success': True,
                 'total_issues': analysis_results.get('total_issues', 0),
@@ -79,7 +82,8 @@ def analyze():
                 'charts': charts,
                 'jql_query': jql_query,
                 'jira_url': jira_url,
-                'metrics': analysis_results['metrics']
+                'metrics': analysis_results['metrics'],
+                'projects': projects
             })
         else:
             # Standard flat analysis
@@ -103,7 +107,8 @@ def analyze():
                 'charts': charts,
                 'jql_query': jql_query,
                 'jira_url': jira_url,
-                'metrics': analysis_results['metrics']
+                'metrics': analysis_results['metrics'],
+                'projects': analysis_results.get('projects', [])
             })
         
     except Exception as e:
@@ -173,7 +178,8 @@ def analyze_csv():
             'jql_query': f"key in ({', '.join(issue_keys[:10])}{'...' if len(issue_keys) > 10 else ''})",
             'jira_url': jira_url,
             'charts': charts,
-            'metrics': analysis_results['metrics']
+            'metrics': analysis_results['metrics'],
+            'projects': analysis_results.get('projects', [])
         })
         
     except Exception as e:

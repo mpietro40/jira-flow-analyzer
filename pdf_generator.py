@@ -185,6 +185,13 @@ class PDFReportGenerator:
         jira_url = data.get('jira_url', 'Unknown server')
         content.append(Paragraph(f"Jira Server: {jira_url}", self.styles['Normal']))
         content.append(Spacer(1, 0.15*inch))
+        
+        # Projects analyzed
+        projects = data.get('projects', [])
+        if projects:
+            projects_str = ', '.join(projects)
+            content.append(Paragraph(f"<b>Projects Analyzed:</b> {projects_str}", self.styles['Normal']))
+            content.append(Spacer(1, 0.15*inch))
     
         # Check if this is CSV upload or standard JQL analysis
         csv_issues_found = data.get('csv_issues_found')
@@ -233,8 +240,11 @@ class PDFReportGenerator:
         
         if 'lead_time' in metrics:
             lt = metrics['lead_time']
+            projects = data.get('projects', [])
+            projects_text = f" from {len(projects)} project(s): {', '.join(projects)}" if projects else ""
+            
             summary_text = f"""
-            This report analyzes {data.get('total_issues', 0)} Jira issues over the past {data.get('analysis_period', 'unknown period')}.
+            This report analyzes {data.get('total_issues', 0)} Jira issues{projects_text} over the past {data.get('analysis_period', 'unknown period')}.
             <br/>
             <b>Key Findings:</b><br/>
             • Average Lead Time: {lt.get('average', 0):.1f} days<br/>
@@ -272,6 +282,17 @@ class PDFReportGenerator:
         
         # Lead time analysis
         content.append(Paragraph("Lead Time Analysis", self.heading_style))
+        
+        # Add explanations for lead time metrics
+        explanations_text = """
+        <b>Lead Time Metrics Explained:</b><br/>
+        • <b>Average Lead Time:</b> The arithmetic mean of all lead times. Useful for capacity planning but can be skewed by outliers.<br/>
+        • <b>Median Lead Time:</b> The middle value when all lead times are sorted. More representative of typical performance than average.<br/>
+        • <b>85th Percentile:</b> 85% of items are completed within this time. Good for setting realistic delivery expectations.<br/>
+        • <b>95th Percentile:</b> 95% of items are completed within this time. Helps identify outliers and worst-case scenarios.<br/>
+        """
+        content.append(Paragraph(explanations_text, self.styles['Normal']))
+        content.append(Spacer(1, 0.2*inch))
         
         metrics = data.get('metrics', {})
         if 'lead_time' in metrics:
