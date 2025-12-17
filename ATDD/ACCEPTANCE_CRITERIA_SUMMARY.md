@@ -222,6 +222,6 @@ The Jira Lead Time Analyzer application successfully meets all defined acceptanc
 
 ---
 
-**Last Updated:** 2024
-**Reviewed By:** Senior Agile Coach Assistant
+**Last Updated:** 12-2025
+**Reviewed By:** Agile Coach Assistant (AI)
 **Status:** APPROVED ✅
