@@ -238,6 +238,17 @@
                         </div>
                     </div>
 
+                    <!-- People Involvement -->
+                    <div id="peopleSection" class="card mb-4" style="display: none;">
+                        <div class="card-header">
+                            <h4><i class="fas fa-users"></i> People Involvement</h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="peopleOverall" class="mb-4"></div>
+                            <div id="peopleByProject"></div>
+                        </div>
+                    </div>
+
                     <!-- Metrics Summary -->
                     <div id="metricsSection" class="row mb-4">
                         <!-- Metrics will be populated here -->
@@ -325,6 +336,11 @@
                 console.log('No projects to display');
             }
             
+            // Display people involvement if available
+            if (data.people_involvement) {
+                displayPeopleInvolvement(data.people_involvement);
+            }
+            
             // Display metrics
             displayMetrics(data.metrics);
             
@@ -343,6 +359,73 @@
                 '</p>';
             
             projectsSection.style.display = 'block';
+        }
+
+        function displayPeopleInvolvement(peopleData) {
+            const peopleSection = document.getElementById('peopleSection');
+            const peopleOverall = document.getElementById('peopleOverall');
+            const peopleByProject = document.getElementById('peopleByProject');
+            
+            // Display overall statistics
+            const overall = peopleData.overall;
+            peopleOverall.innerHTML = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card text-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <div class="card-body">
+                                <h5><i class="fas fa-users"></i> Total People</h5>
+                                <h2>${overall.total_people}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                            <div class="card-body">
+                                <h5><i class="fas fa-user-edit"></i> Reporters</h5>
+                                <h2>${overall.reporters}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                            <div class="card-body">
+                                <h5><i class="fas fa-user-check"></i> Assignees</h5>
+                                <h2>${overall.assignees}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white;">
+                            <div class="card-body">
+                                <h5><i class="fas fa-comments"></i> Commenters</h5>
+                                <h2>${overall.commenters}</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Display by project
+            if (Object.keys(peopleData.by_project).length > 0) {
+                let projectsHtml = '<h5 class="mt-4 mb-3">By Project:</h5><div class="table-responsive"><table class="table table-striped"><thead><tr><th>Project</th><th>Total People</th><th>Reporters</th><th>Assignees</th><th>Commenters</th></tr></thead><tbody>';
+                
+                for (const [project, data] of Object.entries(peopleData.by_project)) {
+                    projectsHtml += `
+                        <tr>
+                            <td><strong>${project}</strong></td>
+                            <td><span class="badge bg-primary">${data.total_people}</span></td>
+                            <td>${data.reporters}</td>
+                            <td>${data.assignees}</td>
+                            <td>${data.commenters}</td>
+                        </tr>
+                    `;
+                }
+                
+                projectsHtml += '</tbody></table></div>';
+                peopleByProject.innerHTML = projectsHtml;
+            }
+            
+            peopleSection.style.display = 'block';
         }
 
         function displayMetrics(metrics) {
