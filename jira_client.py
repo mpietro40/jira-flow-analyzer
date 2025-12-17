@@ -184,7 +184,7 @@ class JiraClient:
                         'startAt': current_start,
                         'maxResults': min(current_batch_size, max_results - len(issues)),
                         'expand': 'changelog',
-                        'fields': 'key,summary,status,created,resolutiondate,assignee,priority,issuetype,timeoriginalestimate,timeestimate,fixVersions,project,customfield_10037,customfield_10095,customfield_10096,customfield_10097,comment'
+                        'fields': 'key,summary,status,created,resolutiondate,assignee,reporter,priority,issuetype,timeoriginalestimate,timeestimate,fixVersions,project,customfield_10037,customfield_10095,customfield_10096,customfield_10097,comment'
                     }
                     
                     logger.info(f"🔄 Fetching batch starting at {current_start} (size: {params['maxResults']}, attempt {attempt + 1}/{self.max_retries})")
@@ -327,6 +327,20 @@ class JiraClient:
             key = issue['key']
             fields = issue['fields']
             
+            # Extract reporter
+            reporter = fields.get('reporter', {}).get('displayName', '') if fields.get('reporter') else ''
+            
+            # Extract comments
+            comments = []
+            comment_data = fields.get('comment', {})
+            if comment_data and 'comments' in comment_data:
+                for comment in comment_data['comments']:
+                    comments.append({
+                        'author': comment.get('author', {}).get('displayName', ''),
+                        'body': comment.get('body', ''),
+                        'created': comment.get('created', '')
+                    })
+            
             processed = {
                 'key': key,
                 'summary': fields.get('summary', ''),
@@ -336,6 +350,8 @@ class JiraClient:
                 'created': fields.get('created'),
                 'resolution_date': fields.get('resolutiondate'),
                 'assignee': fields.get('assignee', {}).get('displayName', '') if fields.get('assignee') else '',
+                'reporter': reporter,
+                'comments': comments,
                 'fields': fields,  # Include raw fields for estimate access
                 'status_history': []
             }

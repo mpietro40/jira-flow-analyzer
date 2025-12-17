@@ -208,6 +208,9 @@ class DataAnalyzer:
         projects = sorted(df_filtered['project'].unique().tolist()) if 'project' in df_filtered.columns else []
         logger.info(f"🏢 Projects analyzed: {projects}")
         
+        # Calculate people involvement
+        people_involvement = self._calculate_people_involvement(issues, df_filtered)
+        
         return {
             'metrics': metrics,
             'distributions': distributions,
@@ -216,7 +219,8 @@ class DataAnalyzer:
             'status_durations': status_durations,
             'analysis_period': f"{months_back} months",
             'total_issues': len(df_filtered),
-            'projects': projects
+            'projects': projects,
+            'people_involvement': people_involvement
         }
     
     
@@ -653,6 +657,81 @@ class DataAnalyzer:
         
         return status_name in self.status_mappings[status_type]
     
+    def _calculate_people_involvement(self, issues: List[Dict], df: pd.DataFrame) -> Dict:
+        """
+        Calculate people involvement across all issues.
+        Counts unique reporters, assignees, and commenters per project and overall.
+        
+        Args:
+            issues (List[Dict]): Original issues list with comments
+            df (pd.DataFrame): Filtered DataFrame
+            
+        Returns:
+            Dict: People involvement statistics
+        """
+        # Create mapping from key to issue for comment data
+        issue_map = {issue['key']: issue for issue in issues}
+        
+        # Track unique people overall and per project
+        overall_people = {'reporters': set(), 'assignees': set(), 'commenters': set()}
+        project_people = {}
+        
+        for _, row in df.iterrows():
+            project = row['project']
+            issue_key = row['key']
+            
+            # Initialize project if not exists
+            if project not in project_people:
+                project_people[project] = {'reporters': set(), 'assignees': set(), 'commenters': set()}
+            
+            # Get reporter from original issue data
+            original_issue = issue_map.get(issue_key, {})
+            reporter = original_issue.get('reporter', '')
+            if reporter and reporter != 'Unassigned':
+                overall_people['reporters'].add(reporter)
+                project_people[project]['reporters'].add(reporter)
+            
+            # Get assignee
+            assignee = row['assignee']
+            if assignee and assignee != 'Unassigned':
+                overall_people['assignees'].add(assignee)
+                project_people[project]['assignees'].add(assignee)
+            
+            # Get commenters
+            comments = original_issue.get('comments', [])
+            for comment in comments:
+                commenter = comment.get('author', '')
+                if commenter:
+                    overall_people['commenters'].add(commenter)
+                    project_people[project]['commenters'].add(commenter)
+        
+        # Calculate totals
+        all_people = overall_people['reporters'] | overall_people['assignees'] | overall_people['commenters']
+        
+        # Build result
+        result = {
+            'overall': {
+                'total_people': len(all_people),
+                'reporters': len(overall_people['reporters']),
+                'assignees': len(overall_people['assignees']),
+                'commenters': len(overall_people['commenters'])
+            },
+            'by_project': {}
+        }
+        
+        for project, people in project_people.items():
+            project_all = people['reporters'] | people['assignees'] | people['commenters']
+            result['by_project'][project] = {
+                'total_people': len(project_all),
+                'reporters': len(people['reporters']),
+                'assignees': len(people['assignees']),
+                'commenters': len(people['commenters'])
+            }
+        
+        logger.info(f"👥 People involvement: {result['overall']['total_people']} total people across {len(project_people)} projects")
+        
+        return result
+    
     def _empty_analysis_result(self) -> Dict:
         """
         Return empty analysis result structure.
@@ -667,5 +746,6 @@ class DataAnalyzer:
             'cycle_times': {},
             'status_durations': {},
             'analysis_period': '0 months',
-            'total_issues': 0
+            'total_issues': 0,
+            'people_involvement': {'overall': {'total_people': 0, 'reporters': 0, 'assignees': 0, 'commenters': 0}, 'by_project': {}}
         }

@@ -83,7 +83,8 @@ def analyze():
                 'jql_query': jql_query,
                 'jira_url': jira_url,
                 'metrics': analysis_results['metrics'],
-                'projects': projects
+                'projects': projects,
+                'people_involvement': analysis_results.get('people_involvement', {})
             })
         else:
             # Standard flat analysis
@@ -108,7 +109,8 @@ def analyze():
                 'jql_query': jql_query,
                 'jira_url': jira_url,
                 'metrics': analysis_results['metrics'],
-                'projects': analysis_results.get('projects', [])
+                'projects': analysis_results.get('projects', []),
+                'people_involvement': analysis_results.get('people_involvement', {})
             })
         
     except Exception as e:
@@ -179,7 +181,8 @@ def analyze_csv():
             'jira_url': jira_url,
             'charts': charts,
             'metrics': analysis_results['metrics'],
-            'projects': analysis_results.get('projects', [])
+            'projects': analysis_results.get('projects', []),
+            'people_involvement': analysis_results.get('people_involvement', {})
         })
         
     except Exception as e:
