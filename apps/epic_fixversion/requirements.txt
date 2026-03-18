@@ -1,0 +1,2 @@
+# Epic Fix Version Analyzer - Additional Dependencies
+# All core dependencies are in the root requirements.txt
