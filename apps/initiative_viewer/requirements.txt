@@ -1,0 +1,10 @@
+# Initiative Viewer - Module Requirements
+# These dependencies are in addition to the shared requirements in requirements.txt (project root)
+
+# Already covered by root requirements.txt:
+# - flask>=3.0.0
+# - waitress>=3.0.0
+# - reportlab>=4.0.0
+# - requests>=2.31.0
+
+# No additional dependencies required for this module

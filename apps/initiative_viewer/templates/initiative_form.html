@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initiative Viewer - Configuration</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .form-group {
+            margin-bottom: 24px;
+        }
+        
+        label {
+            display: block;
+            color: #2d3748;
+            font-weight: 600;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        input[type="password"],
+        textarea {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            font-family: inherit;
+        }
+        
+        input[type="text"]:focus,
+        input[type="password"]:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+        
+        .hint {
+            color: #718096;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        
+        button {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .error {
+            background: #fed7d7;
+            color: #c53030;
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            border-left: 4px solid #c53030;
+        }
+        
+        .info-box {
+            background: #e6fffa;
+            border-left: 4px solid #38b2ac;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+        
+        .info-box h3 {
+            color: #234e52;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .info-box ul {
+            margin-left: 20px;
+            color: #2c7a7b;
+            font-size: 13px;
+        }
+        
+        .info-box li {
+            margin-bottom: 4px;
+        }
+        
+        /* Loading Spinner */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(102, 126, 234, 0.95);
+            z-index: 9999;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+        
+        .loading-overlay.active {
+            display: flex;
+        }
+        
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 6px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .loading-text {
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .loading-subtext {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 14px;
+            margin-top: 10px;
+        }
+
+        /* Checkbox styling */
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #f7fafc;
+            border-radius: 8px;
+            border: 2px solid #e2e8f0;
+            transition: all 0.3s;
+        }
+
+        .checkbox-group:has(input:checked) {
+            background: #e6fffa;
+            border-color: #38b2ac;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: #667eea;
+        }
+
+        .checkbox-group label {
+            margin: 0;
+            cursor: pointer;
+            flex: 1;
+        }
+
+        .checkbox-group .cache-hint {
+            color: #718096;
+            font-size: 12px;
+            font-weight: normal;
+            display: block;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text">Analyzing Jira Hierarchy...</div>
+        <div class="loading-subtext">This may take a few moments</div>
+    </div>
+    <div class="container">
+        <h1>🎯 Initiative Viewer</h1>
+        <p class="subtitle">Hierarchical Jira Analysis Tool - Version 2.0</p>
+        
+        {% if error %}
+        <div class="error">
+            <strong>Error:</strong> {{ error }}
+        </div>
+        {% endif %}
+        
+        <div class="info-box">
+            <h3>📋 Hierarchy Structure</h3>
+            <ul>
+                <li>Business Initiative → Feature → Sub-Feature → Epic</li>
+                <li>Filtered by Fix Version</li>
+                <li>Organized by Area/Project</li>
+                <li>Color-coded by Risk Probability (1-5 scale)</li>
+            </ul>
+        </div>
+        
+        <form method="POST" action="{{ url_for('initiative_viewer.analyze') }}">
+            <div class="form-group">
+                <label for="jira_url">Jira Server URL</label>
+                <input 
+                    type="text" 
+                    id="jira_url" 
+                    name="jira_url" 
+                    placeholder="https://your-company.atlassian.net"
+                    required
+                    value="{{ request.form.get('jira_url', '') }}"
+                >
+                <div class="hint">Enter your Jira instance URL (without trailing slash)</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="access_token">Access Token</label>
+                <input 
+                    type="password" 
+                    id="access_token" 
+                    name="access_token" 
+                    placeholder="Your Jira API token"
+                    required
+                >
+                <div class="hint">Generate token from Jira Account Settings → Security → API Tokens</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="query">Initiative Query (JQL)</label>
+                <textarea 
+                    id="query" 
+                    name="query" 
+                    placeholder='project = ISDOP'
+                    required
+                >{{ request.form.get('query', 'issuetype = "Business Initiative"') }}</textarea>
+                <div class="hint">JQL query to filter Business Initiatives (e.g., project = ISDOP)</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="fix_version">Fix Version</label>
+                <input 
+                    type="text" 
+                    id="fix_version" 
+                    name="fix_version" 
+                    placeholder="PI 2025.1"
+                    required
+                    value="{{ request.form.get('fix_version', '') }}"
+                >
+                <div class="hint">Fix version to filter Features and Sub-Features</div>
+            </div>
+            
+            <div class="checkbox-group">
+                <input
+                    type="checkbox"
+                    id="backward_check"
+                    name="backward_check"
+                    value="true"
+                    onchange="toggleBackwardCheck()"
+                >
+                <label for="backward_check">
+                    🔍 Backward Check Mode
+                    <span class="cache-hint">Find features/sub-features without fixVersion that have epics with children in active sprints. These will be marked with the target PI.</span>
+                </label>
+            </div>
+
+            <div class="checkbox-group" id="use_cache_group">
+                <input
+                    type="checkbox"
+                    id="use_cache"
+                    name="use_cache"
+                    value="true"
+                >
+                <label for="use_cache">
+                    🔄 Use Cached Data (if available)
+                    <span class="cache-hint">Load most recent analysis instead of fetching from Jira. Cache is used only if JQL query matches.</span>
+                </label>
+            </div>
+
+            <div class="checkbox-group" id="enable_limit_group">
+                <input
+                    type="checkbox"
+                    id="enable_limit"
+                    name="enable_limit"
+                    value="true"
+                    onchange="toggleLimitInput()"
+                >
+                <label for="enable_limit">
+                    🔢 Limit Number of Initiatives
+                    <span class="cache-hint">Limit the number of initiatives to analyze for faster processing.</span>
+                </label>
+            </div>
+
+            <div class="form-group" id="limit_count_group" style="display: none; margin-left: 20px;">
+                <label for="limit_count">Maximum Initiatives</label>
+                <input
+                    type="number"
+                    id="limit_count"
+                    name="limit_count"
+                    placeholder="25"
+                    value="25"
+                    min="1"
+                    step="1"
+                >
+                <div class="hint">Enter the maximum number of initiatives to analyze (default: 25)</div>
+            </div>
+
+            <button type="submit" id="submitBtn">🚀 Analyze Initiatives</button>
+        </form>
+    </div>
+    
+    <script>
+        const cacheCheckbox = document.getElementById('use_cache');
+        const backwardCheckbox = document.getElementById('backward_check');
+        const submitBtn = document.getElementById('submitBtn');
+        const loadingText = document.querySelector('.loading-text');
+        const useCacheGroup = document.getElementById('use_cache_group');
+
+        function updateButtonText() {
+            if (backwardCheckbox.checked) {
+                submitBtn.innerHTML = '🔍 Run Backward Check';
+            } else if (cacheCheckbox.checked) {
+                submitBtn.innerHTML = '📂 Load from Cache';
+            } else {
+                submitBtn.innerHTML = '🚀 Analyze Initiatives';
+            }
+        }
+
+        cacheCheckbox.addEventListener('change', updateButtonText);
+        backwardCheckbox.addEventListener('change', updateButtonText);
+
+        function toggleBackwardCheck() {
+            if (backwardCheckbox.checked) {
+                cacheCheckbox.disabled = true;
+                cacheCheckbox.checked = false;
+                useCacheGroup.style.opacity = '0.5';
+            } else {
+                cacheCheckbox.disabled = false;
+                useCacheGroup.style.opacity = '1';
+            }
+            updateButtonText();
+        }
+
+        function toggleLimitInput() {
+            const enableLimit = document.getElementById('enable_limit');
+            const limitGroup = document.getElementById('limit_count_group');
+            const limitInput = document.getElementById('limit_count');
+            if (enableLimit.checked) {
+                limitGroup.style.display = 'block';
+                limitInput.required = true;
+            } else {
+                limitGroup.style.display = 'none';
+                limitInput.required = false;
+            }
+        }
+
+        document.querySelector('form').addEventListener('submit', function(e) {
+            const overlay = document.getElementById('loadingOverlay');
+            const subtext = document.querySelector('.loading-subtext');
+
+            if (backwardCheckbox.checked) {
+                loadingText.textContent = 'Running Backward Check Analysis...';
+                subtext.textContent = 'Checking for active sprints...';
+                overlay.classList.add('active');
+                return; // normal submit
+            }
+
+            if (!cacheCheckbox.checked) {
+                loadingText.textContent = 'Analyzing Jira Hierarchy...';
+                subtext.textContent = 'This may take a few moments';
+                overlay.classList.add('active');
+                return; // normal submit
+            }
+
+            // Cache checkbox is ticked — ask the server first before claiming it's quick
+            e.preventDefault();
+            loadingText.textContent = 'Checking cache\u2026';
+            subtext.textContent = 'One moment\u2026';
+            overlay.classList.add('active');
+
+            const form = this;
+            const params = new URLSearchParams({
+                jira_url:    document.getElementById('jira_url').value.trim(),
+                query:       document.getElementById('query').value.trim(),
+                fix_version: document.getElementById('fix_version').value.trim()
+            });
+
+            fetch('/api/cache_check?' + params.toString())
+                .then(r => r.json())
+                .then(data => {
+                    if (data.has_cache) {
+                        const age = data.age_minutes != null
+                            ? ` (cached ${data.age_minutes} min ago)`
+                            : '';
+                        loadingText.textContent = '\u26a1 Loading Cached Data...';
+                        subtext.textContent = 'Cache hit \u2014 this will be quick!' + age;
+                    } else {
+                        loadingText.textContent = 'No cache available \u2014 Fetching from Jira...';
+                        subtext.textContent = 'This may take a few moments';
+                    }
+                })
+                .catch(() => {
+                    loadingText.textContent = 'Analyzing Jira Hierarchy...';
+                    subtext.textContent = 'This may take a few moments';
+                })
+                .finally(() => {
+                    form.submit();
+                });
+        });
+    </script>
+</body>
+</html>
