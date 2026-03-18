@@ -1,0 +1,2 @@
+# PI Analyzer - No additional dependencies
+# All dependencies are in root requirements.txt

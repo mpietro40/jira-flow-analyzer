@@ -1,0 +1,946 @@
+"""
+PI (Program Increment) Analysis Application
+Analyzes PI metrics for ISDOP project and related projects based on parent/child relationships.
+
+Author: PI Analysis Tool by Pietro Maffi
+Purpose: Analyze PI completion metrics across related Jira projects
+Version: 2.0.0 - Refactored with shared libraries
+"""
+
+import logging
+from datetime import datetime, timedelta
+from typing import List, Dict, Optional, Set
+from collections import defaultdict
+import json
+from pathlib import Path
+
+# Use shared libraries
+from src.common.jira_client import JiraClient
+from src.common.cache_manager import CacheManager
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger('PIAnalyzer')
+
+class PIAnalyzer:
+    """
+    Analyzes Program Increment (PI) metrics for ISDOP and related projects.
+    
+    This class discovers related projects through parent/child relationships
+    and analyzes completion metrics for different issue types during a PI period.
+    """
+    
+    def __init__(self, jira_client: JiraClient, cache_manager: Optional[CacheManager] = None):
+        """
+        Initialize PI analyzer with Jira client and cache manager.
+        
+        Args:
+            jira_client (JiraClient): Configured Jira client instance
+            cache_manager (Optional[CacheManager]): Cache manager instance
+        """
+        self.jira_client = jira_client
+        self.cache_manager = cache_manager or CacheManager(
+            cache_dir='data/cache/pi_analyzer',
+            ttl_minutes=30
+        )
+        
+        # Keep original working timeout settings for PI analysis
+        # Don't override what was working before
+        
+        self._load_configuration()
+    
+    def _fetch_issues_with_cache(self, jql_query: str, max_results: int = 5000) -> List[Dict]:
+        """
+        Fetch issues with caching to avoid redundant queries.
+        
+        Args:
+            jql_query (str): JQL query string
+            max_results (int): Maximum results to fetch
+            
+        Returns:
+            List[Dict]: List of issues (from cache or fresh fetch)
+        """
+        # Create cache key from JQL query
+        cache_key = f"jql_{hash(jql_query)}_{max_results}"
+        
+        # Try to get from cache first
+        cached_issues = self.cache_manager.get(cache_key)
+        if cached_issues is not None:
+            logger.info(f"📋 Cache HIT for query ({len(cached_issues)} issues)")
+            return cached_issues
+        
+        # Cache miss - fetch from Jira
+        logger.info(f"🔄 Fetching fresh data from Jira...")
+        issues = self.jira_client.fetch_issues(jql_query, max_results)
+        
+        # Cache the results
+        self.cache_manager.save(cache_key, issues)
+        logger.info(f"💾 Cached {len(issues)} issues")
+        
+        return issues
+    
+    def _load_configuration(self):
+        """
+        Load configuration from pi_config.json file.
+        """
+        config_path = Path(__file__).parent.parent.parent / 'pi_config.json'
+        
+        # Default configuration
+        default_config = {
+            "base_project": "ISDOP",
+            "excluded_projects": ["E2ECD","PPB","KCCS","TAISS"],
+            "test_mode": {"enabled": False, "test_initiative_id": "ISDOP-2000"},
+            "completion_statuses": ["Done", "Closed", "Resolved","PRD Deployed", "Deployed", "Released", "Completed", "Cancelled", "Abandonned","To Validate"],
+            "in_progress_statuses": ["In Progress", "Doing", "Working", "Development","Estimation","Work In Progress", "To Test", "Testing", "Code Review", "Ready for Development"],
+            "issue_types": ["Bug","Analysis", "Configuration", "Defect (Sub-Task)", "Documentation", "Epic", 
+"Evolution", "Feature", "Improvement", "Incident (Sub-Task)","Info", "Information", "InvoiceTask", "Story", 
+"Sub-Feature", "Sub-task", "Task", "Technical Improvement", "Technical subtask", "Technical task"]
+        }
+        
+        try:
+            if config_path.exists():
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                logger.info(f"📋 Loaded configuration from {config_path}")
+            else:
+                config = default_config
+                logger.info("📋 Using default configuration")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to load config, using defaults: {str(e)}")
+            config = default_config
+        
+        # Set configuration values
+        self.base_project = config.get("base_project", "ISDOP")
+        self.excluded_projects = set(config.get("excluded_projects", ["E2ECD"]))
+        self.test_mode = config.get("test_mode", {"enabled": False, "test_initiative_id": "ISDOP-2000"})
+        self.completion_statuses = config.get("completion_statuses", ["Done", "Closed", "Resolved"])
+        self.in_progress_statuses = config.get("in_progress_statuses", ["In Progress", "Doing", "Working", "Development"])
+        self.issue_types = config.get("issue_types", ["Bug", "Story", "Sub-task", "Sub-Feature", "Feature"])
+        self.flow_recommendations = config.get("flow_metrics_recommendations", {})
+        
+        # Display detailed configuration
+        self._display_configuration()
+    
+    def _load_timeout_configuration(self) -> Dict:
+        """
+        Load timeout configuration from timeout_config.json file.
+        
+        Returns:
+            Dict: Timeout configuration parameters
+        """
+        config_path = os.path.join(os.path.dirname(__file__), 'timeout_config.json')
+        
+        # Default timeout settings
+        default_settings = {
+            "connect_timeout": 20,
+            "read_timeout": 120,
+            "batch_size": 100,
+            "min_batch_size": 25
+        }
+        
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                timeout_settings = config.get('timeout_settings', default_settings)
+                logger.info(f"⚙️ Loaded timeout configuration: connect={timeout_settings.get('connect_timeout')}s, read={timeout_settings.get('read_timeout')}s, batch={timeout_settings.get('batch_size')}")
+                return timeout_settings
+            else:
+                logger.info("⚙️ Using default timeout configuration")
+                return default_settings
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to load timeout config, using defaults: {str(e)}")
+            return default_settings
+    
+    def _display_configuration(self):
+        """
+        Display detailed configuration information in console.
+        """
+        logger.info("\n" + "="*60)
+        logger.info("📊 PI ANALYZER CONFIGURATION")
+        logger.info("="*60)
+        
+        # Base project configuration
+        logger.info(f"🎯 BASE PROJECT TO SCAN:")
+        logger.info(f"   • {self.base_project}")
+        
+        # Excluded projects
+        logger.info(f"\n🚫 EXCLUDED PROJECTS:")
+        if self.excluded_projects:
+            for project in sorted(self.excluded_projects):
+                logger.info(f"   • {project}")
+        else:
+            logger.info("   • None")
+        
+        # Completion statuses
+        logger.info(f"\n✅ COMPLETION STATUSES FOR SCANNING:")
+        for status in self.completion_statuses:
+            logger.info(f"   • {status}")
+        
+        # In-progress statuses (for flow metrics)
+        logger.info(f"\n🔄 IN-PROGRESS STATUSES (Flow Metrics):")
+        for status in self.in_progress_statuses:
+            logger.info(f"   • {status}")
+        
+        # Issue types
+        logger.info(f"\n📝 ISSUE TYPES TO ANALYZE:")
+        for issue_type in self.issue_types:
+            logger.info(f"   • {issue_type}")
+        
+        # Test mode
+        if self.test_mode.get("enabled", False):
+            logger.info(f"\n🧪 TEST MODE ENABLED:")
+            logger.info(f"   • Test Initiative: {self.test_mode.get('test_initiative_id')}")
+            logger.info(f"   • Only this initiative will be analyzed")
+        else:
+            logger.info(f"\n🌐 PRODUCTION MODE:")
+            logger.info(f"   • All Business Initiatives from {self.base_project} will be analyzed")
+        
+        logger.info("="*60 + "\n")
+    
+    def analyze_pi(self, pi_start_date: str, pi_end_date: str, include_full_backlog: bool = False) -> Dict:
+        """
+        Analyze PI metrics for ISDOP and related projects.
+        
+        Args:
+            pi_start_date (str): PI start date (YYYY-MM-DD format)
+            pi_end_date (str): PI end date (YYYY-MM-DD format)
+            include_full_backlog (bool): Include full area backlog analysis with flow metrics
+            
+        Returns:
+            Dict: Complete PI analysis results
+        """
+        # Display analysis scope
+        logger.info("\n" + "="*60)
+        logger.info("🚀 STARTING PI ANALYSIS")
+        logger.info("="*60)
+        logger.info(f"📅 PI Period: {pi_start_date} to {pi_end_date}")
+        logger.info(f"🎯 Target Project: {self.base_project}")
+        logger.info(f"🔍 Analysis Type: {'Full Backlog + Flow Metrics' if include_full_backlog else 'Completion Metrics Only'}")
+        logger.info(f"🚫 Excluded Projects: {', '.join(sorted(self.excluded_projects)) if self.excluded_projects else 'None'}")
+        
+        # Cache is active
+        logger.info("🗄️ Cache Status: Active (30-minute TTL)")
+        logger.info("="*60 + "\n")
+        
+        # Step 1: Discover related projects
+        related_projects = self._discover_related_projects()
+        
+        # Step 2: Fetch completed issues during PI period
+        pi_issues = self._fetch_pi_issues(pi_start_date, pi_end_date, related_projects)
+        
+        # Step 3: Analyze metrics by issue type
+        metrics = self._analyze_pi_metrics(pi_issues)
+        
+        # Step 4: Full backlog analysis if requested
+        flow_metrics = None
+        if include_full_backlog:
+            # Get actual projects from completed issues for flow analysis
+            actual_projects = set(metrics.get('by_project', {}).keys())
+            # Filter out excluded projects
+            actual_projects = actual_projects - self.excluded_projects
+            flow_metrics = self._analyze_flow_metrics(pi_start_date, pi_end_date, actual_projects)
+        
+        # Step 5: Create comprehensive report
+        report = self._create_pi_report(pi_start_date, pi_end_date, related_projects, metrics, flow_metrics)
+        
+        # Final logging
+        logger.info("\n✅ PI analysis completed successfully")
+        return report
+    
+    def _discover_related_projects(self) -> Set[str]:
+        """
+        For PI analysis, we focus on ISDOP initiatives and their children.
+        Project discovery is handled during issue fetching.
+        
+        Returns:
+            Set[str]: Set of related project keys
+        """
+        logger.info(f"🔍 PROJECT DISCOVERY:")
+        logger.info(f"   • Primary focus: {self.base_project} Business Initiatives")
+        logger.info(f"   • Child projects will be discovered automatically")
+        logger.info(f"   • Projects to exclude: {', '.join(sorted(self.excluded_projects)) if self.excluded_projects else 'None'}")
+        return {self.base_project}
+    
+    def _get_isdop_initiatives(self) -> List[Dict]:
+        """
+        Get Business Initiatives from ISDOP project.
+        In test mode, returns only the specified test initiative.
+        
+        Returns:
+            List[Dict]: List of business initiative issues
+        """
+        if self.test_mode.get("enabled", False):
+            test_id = self.test_mode.get("test_initiative_id", "ISDOP-2000")
+            logger.info(f"🧪 Test mode: Fetching single initiative {test_id}")
+            
+            jql_query = f'key = "{test_id}"'
+            
+            try:
+                initiatives = self._fetch_issues_with_cache(jql_query, max_results=1)
+                logger.info(f"📊 Test mode: Found {len(initiatives)} initiative(s)")
+                return initiatives
+            except Exception as e:
+                logger.error(f"🚩 Failed to fetch test initiative: {str(e)}")
+                return []
+        else:
+            logger.info(f"🎯 Fetching all business initiatives from ISDOP")
+            
+            jql_query = 'project = ISDOP AND issuetype = "Business Initiative"'
+            
+            try:
+                initiatives = self._fetch_issues_with_cache(jql_query, max_results=500)
+                logger.info(f"📊 Found {len(initiatives)} business initiatives")
+                return initiatives
+                
+            except Exception as e:
+                logger.error(f"🚩 Failed to fetch initiatives: {str(e)}")
+                return []
+    
+
+    
+    def _fetch_pi_issues(self, start_date: str, end_date: str, projects: Set[str]) -> List[Dict]:
+        """
+        Fetch issues completed during PI period using initiative-based approach.
+        
+        Args:
+            start_date (str): PI start date
+            end_date (str): PI end date
+            projects (Set[str]): Set of project keys to analyze
+            
+        Returns:
+            List[Dict]: List of completed issues during PI
+        """
+        logger.info(f"📥 Fetching completed issues using initiative-based approach")
+        
+        all_issues = []
+        
+        try:
+            # Get ISDOP initiatives
+            initiatives = self._get_isdop_initiatives()
+            
+            # For each initiative, get completed child elements in PI period
+            for initiative in initiatives:
+                initiative_issues = self._fetch_initiative_pi_issues(
+                    initiative['key'], start_date, end_date
+                )
+                all_issues.extend(initiative_issues)
+                logger.info(f"📊 Initiative {initiative['key']}: {len(initiative_issues)} completed issues")
+            
+            # Also get direct ISDOP issues completed in PI period
+            direct_issues = self._fetch_direct_project_issues(start_date, end_date)
+            all_issues.extend(direct_issues)
+            logger.info(f"📊 Direct {self.base_project} issues: {len(direct_issues)} completed")
+            
+            # Remove duplicates by key
+            unique_issues = {issue['key']: issue for issue in all_issues}
+            all_issues = list(unique_issues.values())
+            
+            logger.info(f"✅ Total unique completed issues: {len(all_issues)}")
+            return all_issues
+            
+        except Exception as e:
+            logger.error(f"🚩 Failed to fetch PI issues: {str(e)}")
+            return []
+    
+    def _fetch_initiative_pi_issues(self, initiative_key: str, start_date: str, end_date: str) -> List[Dict]:
+        """
+        Fetch completed child issues for a specific initiative during PI period.
+        
+        Args:
+            initiative_key (str): Business initiative key
+            start_date (str): PI start date
+            end_date (str): PI end date
+            
+        Returns:
+            List[Dict]: List of completed child issues
+        """
+        status_list = ','.join([f'"{status}"' for status in self.completion_statuses])
+        issue_type_list = ','.join([f'"{issue_type}"' for issue_type in self.issue_types])
+        
+        jql_query = (f'issuekey in childIssuesOf("{initiative_key}") '
+                    f'AND resolved >= "{start_date}" '
+                    f'AND resolved <= "{end_date}" '
+                    f'AND status IN ({status_list}) '
+                    f'AND issuetype IN ({issue_type_list})')
+        
+        logger.debug(f"🔍 Initiative JQL: {jql_query}")
+        
+        try:
+            # Fetch all issues at once using cache
+            raw_issues = self._fetch_issues_with_cache(jql_query, max_results=1000)
+            
+            if not raw_issues:
+                return []
+            
+            # Enhance issues with estimate data (with progress logging)
+            logger.info(f"🔧 Enhancing {len(raw_issues)} issues with estimate data for {initiative_key}...")
+            issues = []
+            for i, issue in enumerate(raw_issues, 1):
+                if i % 10 == 0:  # Log every 10 issues
+                    logger.info(f"   📊 Enhanced {i}/{len(raw_issues)} issues")
+                
+                enhanced_issue = self._enhance_issue_with_estimates(issue)
+                if enhanced_issue:
+                    issues.append(enhanced_issue)
+            
+            logger.info(f"✅ Enhanced {len(issues)} issues successfully")
+            return issues
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to fetch issues for initiative {initiative_key}: {str(e)}")
+            return []
+    
+    def _fetch_direct_project_issues(self, start_date: str, end_date: str) -> List[Dict]:
+        """
+        Fetch completed issues directly from ISDOP project.
+        
+        Args:
+            start_date (str): PI start date
+            end_date (str): PI end date
+            
+        Returns:
+            List[Dict]: List of completed ISDOP issues
+        """
+        status_list = ','.join([f'"{status}"' for status in self.completion_statuses])
+        issue_type_list = ','.join([f'"{issue_type}"' for issue_type in self.issue_types])
+        
+        jql_query = (f'project = {self.base_project} '
+                    f'AND resolved >= "{start_date}" '
+                    f'AND resolved <= "{end_date}" '
+                    f'AND status IN ({status_list}) '
+                    f'AND issuetype IN ({issue_type_list})')
+        
+        try:
+            # Fetch all issues at once using cache
+            raw_issues = self._fetch_issues_with_cache(jql_query, max_results=1000)
+            
+            if not raw_issues:
+                return []
+            
+            # Enhance issues with estimate data (with progress logging)
+            logger.info(f"🔧 Enhancing {len(raw_issues)} direct {self.base_project} issues with estimate data...")
+            issues = []
+            for i, issue in enumerate(raw_issues, 1):
+                if i % 10 == 0:  # Log every 10 issues
+                    logger.info(f"   📊 Enhanced {i}/{len(raw_issues)} issues")
+                
+                enhanced_issue = self._enhance_issue_with_estimates(issue)
+                if enhanced_issue:
+                    issues.append(enhanced_issue)
+            
+            logger.info(f"✅ Enhanced {len(issues)} issues successfully")
+            return issues
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to fetch direct {self.base_project} issues: {str(e)}")
+            return []
+    
+    def _enhance_issue_with_estimates(self, issue: Dict) -> Optional[Dict]:
+        """
+        Enhance issue with estimate information.
+        
+        Args:
+            issue (Dict): Basic issue data
+            
+        Returns:
+            Optional[Dict]: Enhanced issue with estimate data
+        """
+        try:
+            # Fetch detailed issue data with original timeout
+            response = self.jira_client.session.get(
+                f"{self.jira_client.base_url}/rest/api/2/issue/{issue['key']}",
+                params={'fields': 'timeoriginalestimate,issuetype,project,resolution,resolutiondate'}
+            )
+            
+            if response.status_code != 200:
+                logger.warning(f"⚠️ Could not fetch estimate data for {issue['key']}")
+                return issue
+            
+            detailed_data = response.json()
+            fields = detailed_data.get('fields', {})
+            
+            # Extract relevant data
+            original_estimate_seconds = fields.get('timeoriginalestimate') or 0
+            original_estimate_hours = original_estimate_seconds / 3600
+            
+            issue.update({
+                'original_estimate_hours': original_estimate_hours,
+                'has_estimate': original_estimate_seconds > 0,
+                'project_key': fields.get('project', {}).get('key', ''),
+                'issue_type_name': fields.get('issuetype', {}).get('name', ''),
+                'resolution_date': fields.get('resolutiondate')
+            })
+            
+            return issue
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to enhance issue {issue.get('key', 'unknown')}: {str(e)}")
+            return issue
+    
+    def _analyze_pi_metrics(self, issues: List[Dict]) -> Dict:
+        """
+        Analyze PI metrics by issue type.
+        
+        Args:
+            issues (List[Dict]): List of completed issues
+            
+        Returns:
+            Dict: PI metrics analysis
+        """
+        logger.info(f"📊 Analyzing metrics for {len(issues)} issues")
+        
+        # Initialize metrics structure
+        metrics = {
+            'total_issues': len(issues),
+            'by_type': defaultdict(lambda: {
+                'count': 0,
+                'total_estimate_hours': 0,
+                'estimated_count': 0,
+                'unestimated_count': 0,
+                'unestimated_percentage': 0
+            }),
+            'by_project': defaultdict(lambda: {
+                'count': 0,
+                'total_estimate_hours': 0
+            }),
+            'summary': {
+                'total_estimate_hours': 0,
+                'total_estimated_issues': 0,
+                'total_unestimated_issues': 0,
+                'overall_unestimated_percentage': 0
+            }
+        }
+        
+        # Analyze each issue
+        for issue in issues:
+            issue_type = issue.get('issue_type_name', 'Unknown')
+            project_key = issue.get('project_key', 'Unknown')
+            estimate_hours = issue.get('original_estimate_hours', 0)
+            has_estimate = issue.get('has_estimate', False)
+            
+            # Update type metrics
+            type_metrics = metrics['by_type'][issue_type]
+            type_metrics['count'] += 1
+            type_metrics['total_estimate_hours'] += estimate_hours
+            
+            if has_estimate:
+                type_metrics['estimated_count'] += 1
+                metrics['summary']['total_estimated_issues'] += 1
+            else:
+                type_metrics['unestimated_count'] += 1
+                metrics['summary']['total_unestimated_issues'] += 1
+            
+            # Update project metrics
+            project_metrics = metrics['by_project'][project_key]
+            project_metrics['count'] += 1
+            project_metrics['total_estimate_hours'] += estimate_hours
+            
+            # Update summary
+            metrics['summary']['total_estimate_hours'] += estimate_hours
+        
+        # Calculate percentages
+        for issue_type, type_metrics in metrics['by_type'].items():
+            if type_metrics['count'] > 0:
+                type_metrics['unestimated_percentage'] = (
+                    type_metrics['unestimated_count'] / type_metrics['count'] * 100
+                )
+        
+        # Calculate overall percentage
+        if metrics['total_issues'] > 0:
+            metrics['summary']['overall_unestimated_percentage'] = (
+                metrics['summary']['total_unestimated_issues'] / metrics['total_issues'] * 100
+            )
+        
+        # Log summary
+        logger.info(f"📈 Analysis complete:")
+        logger.info(f"  📊 Total issues: {metrics['total_issues']}")
+        logger.info(f"  ⏱️ Total estimates: {metrics['summary']['total_estimate_hours']:.1f}h")
+        logger.info(f"  📋 Estimated issues: {metrics['summary']['total_estimated_issues']}")
+        logger.info(f"  ❓ Unestimated: {metrics['summary']['total_unestimated_issues']} ({metrics['summary']['overall_unestimated_percentage']:.1f}%)")
+        
+        return dict(metrics)
+    
+    def _analyze_flow_metrics(self, start_date: str, end_date: str, projects: Set[str]) -> Dict:
+        """
+        Analyze flow metrics for each area backlog.
+        
+        Args:
+            start_date (str): PI start date
+            end_date (str): PI end date
+            projects (Set[str]): Related projects
+            
+        Returns:
+            Dict: Flow metrics by project
+        """
+        logger.info(f"🔄 Analyzing flow metrics for {len(projects)} areas")
+        
+        flow_metrics = {}
+        
+        for project in projects:
+            logger.info(f"📊 Analyzing flow metrics for {project}")
+            
+            # Get all issues in project during PI period
+            all_issues = self._fetch_project_flow_issues(project, start_date, end_date)
+            
+            if all_issues:
+                project_metrics = self._calculate_project_flow_metrics(project, all_issues, start_date, end_date)
+                flow_metrics[project] = project_metrics
+        
+        return flow_metrics
+    
+    def _fetch_project_flow_issues(self, project: str, start_date: str, end_date: str) -> List[Dict]:
+        """
+        Fetch all issues for flow metrics analysis.
+        
+        Args:
+            project (str): Project key
+            start_date (str): PI start date
+            end_date (str): PI end date
+            
+        Returns:
+            List[Dict]: All relevant issues
+        """
+        # Get completed issues
+        issue_type_list = ','.join([f'"{issue_type}"' for issue_type in self.issue_types])
+        completed_jql = (f'project = {project} '
+                        f'AND resolved >= "{start_date}" '
+                        f'AND resolved <= "{end_date}" '
+                        f'AND issuetype IN ({issue_type_list})')
+        
+        # Get in-progress issues
+        in_progress_statuses = ','.join([f'"{status}"' for status in self.in_progress_statuses])
+        wip_jql = (f'project = {project} '
+                  f'AND status IN ({in_progress_statuses}) '
+                  ### f'AND created <= "{end_date}" '
+                  f'AND issuetype IN ({issue_type_list})')
+        
+        all_issues = []
+        
+        try:
+            # Fetch completed issues
+            completed_issues = self._fetch_issues_with_cache(completed_jql, max_results=1000)
+            all_issues.extend(completed_issues)
+            
+            # Fetch WIP issues
+            wip_issues = self._fetch_issues_with_cache(wip_jql, max_results=1000)
+            all_issues.extend(wip_issues)
+            
+            # Enhance with detailed data
+            enhanced_issues = []
+            for issue in all_issues:
+                enhanced = self._enhance_issue_with_flow_data(issue)
+                if enhanced:
+                    enhanced_issues.append(enhanced)
+            
+            return enhanced_issues
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to fetch flow issues for {project}: {str(e)}")
+            return []
+    
+    def _enhance_issue_with_flow_data(self, issue: Dict) -> Optional[Dict]:
+        """
+        Enhance issue with flow metrics data.
+        
+        Args:
+            issue (Dict): Basic issue data
+            
+        Returns:
+            Optional[Dict]: Enhanced issue with flow data
+        """
+        try:
+            response = self.jira_client.session.get(
+                f"{self.jira_client.base_url}/rest/api/2/issue/{issue['key']}",
+                params={'fields': 'created,resolutiondate,status,changelog', 'expand': 'changelog'}
+            )
+            
+            if response.status_code != 200:
+                return issue
+            
+            detailed_data = response.json()
+            fields = detailed_data.get('fields', {})
+            
+            # Calculate flow metrics
+            created_date = fields.get('created')
+            resolved_date = fields.get('resolutiondate')
+            current_status = fields.get('status', {}).get('name', '')
+            
+            # Find first in-progress date from changelog
+            in_progress_date = self._find_in_progress_date(detailed_data.get('changelog', {}))
+            
+            issue.update({
+                'created_date': created_date,
+                'resolved_date': resolved_date,
+                'current_status': current_status,
+                'in_progress_date': in_progress_date,
+                'is_completed': resolved_date is not None,
+                'is_wip': current_status in self.in_progress_statuses
+            })
+            
+            return issue
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to enhance flow data for {issue.get('key', 'unknown')}: {str(e)}")
+            return issue
+    
+    def _find_in_progress_date(self, changelog: Dict) -> Optional[str]:
+        """
+        Find the first date when issue moved to in-progress status.
+        
+        Args:
+            changelog (Dict): Issue changelog
+            
+        Returns:
+            Optional[str]: First in-progress date
+        """
+        histories = changelog.get('histories', [])
+        
+        for history in histories:
+            for item in history.get('items', []):
+                if (item.get('field') == 'status' and 
+                    item.get('toString') in self.in_progress_statuses):
+                    return history.get('created')
+        
+        return None
+    
+    def _calculate_project_flow_metrics(self, project: str, issues: List[Dict], start_date: str, end_date: str) -> Dict:
+        """
+        Calculate flow metrics for a project.
+        
+        Args:
+            project (str): Project key
+            issues (List[Dict]): Project issues
+            start_date (str): PI start date
+            end_date (str): PI end date
+            
+        Returns:
+            Dict: Flow metrics
+        """
+        from datetime import datetime, timedelta
+        import statistics
+        
+        completed_issues = [i for i in issues if i.get('is_completed', False)]
+        wip_issues = [i for i in issues if i.get('is_wip', False)]
+        
+        # 1. Work in Progress
+        wip_count = len(wip_issues)
+        
+        # 2. Throughput (items per week)
+        pi_start = datetime.strptime(start_date, '%Y-%m-%d')
+        pi_end = datetime.strptime(end_date, '%Y-%m-%d')
+        pi_weeks = (pi_end - pi_start).days / 7
+        throughput = len(completed_issues) / max(pi_weeks, 1)
+        
+        # 3. Work Item Age (for WIP items)
+        ages = []
+        for issue in wip_issues:
+            if issue.get('in_progress_date'):
+                try:
+                    start_dt = datetime.fromisoformat(issue['in_progress_date'].replace('Z', '+00:00')).replace(tzinfo=None)
+                    age_days = (pi_end - start_dt).days
+                    ages.append(max(age_days, 0))
+                except Exception:
+                    continue
+        
+        avg_age = statistics.mean(ages) if ages else 0
+        
+        # 4. Cycle Time (for completed items)
+        cycle_times = []
+        for issue in completed_issues:
+            if issue.get('in_progress_date') and issue.get('resolved_date'):
+                try:
+                    start_dt = datetime.fromisoformat(issue['in_progress_date'].replace('Z', '+00:00')).replace(tzinfo=None)
+                    end_dt = datetime.fromisoformat(issue['resolved_date'].replace('Z', '+00:00')).replace(tzinfo=None)
+                    cycle_days = (end_dt - start_dt).days
+                    cycle_times.append(max(cycle_days, 0))
+                except Exception:
+                    continue
+        
+        avg_cycle_time = statistics.mean(cycle_times) if cycle_times else 0
+        
+        metrics = {
+            'work_in_progress': wip_count,
+            'throughput_per_week': round(throughput, 2),
+            'avg_work_item_age_days': round(avg_age, 1),
+            'avg_cycle_time_days': round(avg_cycle_time, 1),
+            'total_completed': len(completed_issues),
+            'total_issues': len(issues)
+        }
+        
+        # Add coaching recommendations
+        metrics['coaching_recommendations'] = self._generate_coaching_recommendations(metrics)
+        
+        return metrics
+    
+    def _create_pi_report(self, start_date: str, end_date: str, projects: Set[str], metrics: Dict, flow_metrics: Optional[Dict] = None) -> Dict:
+        """
+        Create comprehensive PI analysis report.
+        
+        Args:
+            start_date (str): PI start date
+            end_date (str): PI end date
+            projects (Set[str]): Analyzed projects
+            metrics (Dict): Analysis metrics
+            
+        Returns:
+            Dict: Complete PI report
+        """
+        # Get actual projects from the metrics (where issues were found)
+        actual_projects = [p for p in metrics.get('by_project', {}).keys() if p not in self.excluded_projects]
+        
+        report = {
+            'pi_period': {
+                'start_date': start_date,
+                'end_date': end_date,
+                'duration_days': (datetime.strptime(end_date, '%Y-%m-%d') - 
+                                datetime.strptime(start_date, '%Y-%m-%d')).days
+            },
+            'analyzed_projects': sorted(actual_projects),
+            'base_project': self.base_project,
+            'excluded_projects': list(self.excluded_projects),
+            'completion_statuses': self.completion_statuses,
+            'in_progress_statuses': self.in_progress_statuses,
+            'flow_metrics_config': self.flow_recommendations,
+            'analysis_date': datetime.now().isoformat(),
+            'metrics': metrics,
+            'summary': {
+                'total_projects': len(actual_projects),
+                'total_issues': metrics['total_issues'],
+                'total_estimate_hours': metrics['summary']['total_estimate_hours'],
+                'unestimated_percentage': metrics['summary']['overall_unestimated_percentage']
+            }
+        }
+        
+        # Add flow metrics if available
+        if flow_metrics:
+            report['flow_metrics'] = flow_metrics
+            report['has_flow_metrics'] = True
+            # Add overall coaching summary
+            report['coaching_summary'] = self._generate_overall_coaching_summary(flow_metrics)
+        else:
+            report['has_flow_metrics'] = False
+        
+        return report
+    def _generate_coaching_recommendations(self, metrics: Dict) -> List[Dict]:
+        """
+        Generate coaching recommendations based on flow metrics.
+        
+        Args:
+            metrics (Dict): Project flow metrics
+            
+        Returns:
+            List[Dict]: List of coaching recommendations
+        """
+        recommendations = []
+        
+        # Use default thresholds if config is not available
+        # WIP Analysis
+        wip = metrics.get('work_in_progress', 0)
+        wip_config = self.flow_recommendations.get('wip_limits', {}) if self.flow_recommendations else {}
+        wip_critical = wip_config.get('critical_threshold', 50)
+        wip_warning = wip_config.get('warning_threshold', 30)
+        wip_advice = wip_config.get('coaching_advice', 'High WIP indicates context switching. Consider implementing WIP limits and pull-based workflow.')
+        
+        if wip > wip_critical:
+            recommendations.append({
+                'metric': 'Work in Progress',
+                'severity': 'Critical',
+                'current_value': wip,
+                'threshold': wip_critical,
+                'advice': wip_advice
+            })
+        elif wip > wip_warning:
+            recommendations.append({
+                'metric': 'Work in Progress',
+                'severity': 'Warning',
+                'current_value': wip,
+                'threshold': wip_warning,
+                'advice': wip_advice
+            })
+        
+        # Cycle Time Analysis
+        cycle_time = metrics.get('avg_cycle_time_days', 0)
+        cycle_config = self.flow_recommendations.get('cycle_time', {}) if self.flow_recommendations else {}
+        cycle_critical = cycle_config.get('critical_threshold', 40)
+        cycle_warning = cycle_config.get('warning_threshold', 21)
+        cycle_advice = cycle_config.get('coaching_advice', 'Long cycle times indicate large work items or process bottlenecks. Break down work and identify constraints.')
+        
+        if cycle_time > cycle_critical:
+            recommendations.append({
+                'metric': 'Cycle Time',
+                'severity': 'Critical',
+                'current_value': f"{cycle_time:.1f} days",
+                'threshold': f"{cycle_critical} days",
+                'advice': cycle_advice
+            })
+        elif cycle_time > cycle_warning:
+            recommendations.append({
+                'metric': 'Cycle Time',
+                'severity': 'Warning',
+                'current_value': f"{cycle_time:.1f} days",
+                'threshold': f"{cycle_warning} days",
+                'advice': cycle_advice
+            })
+        
+        # Work Item Age Analysis
+        age = metrics.get('avg_work_item_age_days', 0)
+        age_config = self.flow_recommendations.get('work_item_age', {}) if self.flow_recommendations else {}
+        age_critical = age_config.get('critical_threshold', 21)
+        age_warning = age_config.get('warning_threshold', 14)
+        age_advice = age_config.get('coaching_advice', 'Aging work items suggest blocked or forgotten work. Improve daily scrum and visual management.')
+        
+        if age > age_critical:
+            recommendations.append({
+                'metric': 'Work Item Age',
+                'severity': 'Critical',
+                'current_value': f"{age:.1f} days",
+                'threshold': f"{age_critical} days",
+                'advice': age_advice
+            })
+        elif age > age_warning:
+            recommendations.append({
+                'metric': 'Work Item Age',
+                'severity': 'Warning',
+                'current_value': f"{age:.1f} days",
+                'threshold': f"{age_warning} days",
+                'advice': age_advice
+            })
+        
+        return recommendations
+    
+    def _generate_overall_coaching_summary(self, flow_metrics: Dict) -> Dict:
+        """
+        Generate overall coaching summary across all projects.
+        
+        Args:
+            flow_metrics (Dict): Flow metrics for all projects
+            
+        Returns:
+            Dict: Overall coaching summary
+        """
+        all_recommendations = []
+        critical_count = 0
+        warning_count = 0
+        
+        for project, metrics in flow_metrics.items():
+            project_recommendations = metrics.get('coaching_recommendations', [])
+            for rec in project_recommendations:
+                rec['project'] = project
+                all_recommendations.append(rec)
+                if rec['severity'] == 'Critical':
+                    critical_count += 1
+                elif rec['severity'] == 'Warning':
+                    warning_count += 1
+        
+        # Get general recommendations from config
+        general_advice = self.flow_recommendations.get('general_recommendations', [])
+        
+        return {
+            'total_recommendations': len(all_recommendations),
+            'critical_issues': critical_count,
+            'warning_issues': warning_count,
+            'all_recommendations': all_recommendations,
+            'general_recommendations': general_advice,
+            'overall_health': 'Critical' if critical_count > 0 else 'Warning' if warning_count > 0 else 'Healthy'
+        }
