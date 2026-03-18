@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Behavior Charts - Lead Time Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .main-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+        .status-stable { background: #d4edda; border-left: 5px solid #28a745; }
+        .status-unstable { background: #f8d7da; border-left: 5px solid #dc3545; }
+        .status-warning { background: #fff3cd; border-left: 5px solid #ffc107; }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin: 20px 0;
+        }
+        .project-section {
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .special-cause {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .trend-alert {
+            background: #cfe2ff;
+            border-left: 4px solid #0d6efd;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        .spinner-border {
+            width: 3rem;
+            height: 3rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="main-card">
+                    <h1><i class="fas fa-chart-line"></i> Process Behavior Charts - Lead Time Analysis</h1>
+                    <p class="text-muted">Statistical Process Control for identifying trends and special causes in lead time metrics based on
+                        Jira issue data and this article: <a href="https://www.infoq.com/articles/DORA-metrics-PBCs/" target="_blank">
+                            Stop Guessing, Start Improving: Using DORA Metrics and Process Behavior Charts</a>
+                    </p>
+                    <hr>
+                    
+                    <!-- Input Form -->
+                    <form id="analysisForm">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label"><i class="fas fa-link"></i> Jira URL</label>
+                                <input type="url" class="form-control" name="jira_url" required 
+                                       placeholder="https://your-domain.atlassian.net">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label"><i class="fas fa-key"></i> Access Token</label>
+                                <input type="password" class="form-control" name="access_token" required>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-9">
+                                <label class="form-label"><i class="fas fa-search"></i> JQL Query</label>
+                                <input type="text" class="form-control" name="jql_query" required
+                                       value="{{ config.default_jql }}">
+                                <small class="text-muted">Query to fetch initial issues (related projects will be discovered automatically)</small>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label"><i class="fas fa-calendar"></i> Start Date</label>
+                                <input type="date" class="form-control" name="start_date" 
+                                       value="{{ config.start_date }}" required>
+                                <small class="text-muted">Default: Aug 2024</small>
+                            </div>
+                        </div>
+                        
+                        <div class="row mt-3">
+                            <div class="col-md-12">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="debug" id="debugMode">
+                                    <label class="form-check-label" for="debugMode">
+                                        <i class="fas fa-bug"></i> Enable Debug Logging (show all JQL queries executed)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-chart-area"></i> Analyze Lead Time Trends
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <!-- Info Box -->
+                    <div class="alert alert-info mt-4">
+                        <i class="fas fa-info-circle"></i> <strong>About Process Behavior Charts:</strong>
+                        <p class="mb-0">{{ config.analysis_description }}</p>
+                        <ul class="mt-2 mb-0">
+                            <li><strong>Project Discovery:</strong> Automatically finds related projects through parent/child relationships</li>
+                            <li><strong>Median:</strong> Typical lead time (middle value)</li>
+                            <li><strong>85th Percentile (P85):</strong> 85% of issues completed within this time</li>
+                            <li><strong>Control Limits:</strong> Natural process boundaries (±3σ from mean)</li>
+                            <li><strong>Special Causes:</strong> Points outside control limits or significant trends</li>
+                        </ul>
+                    </div>
+                </div>
+                
+                <!-- Loading Indicator -->
+                <div id="loading" class="loading main-card">
+                    <div class="spinner-border text-primary" role="status"></div>
+                    <h4 class="mt-3">Analyzing Process Behavior...</h4>
+                    <p class="text-muted">Calculating control limits and detecting trends</p>
+                </div>
+                
+                <!-- Error Container -->
+                <div id="errorContainer"></div>
+                
+                <!-- Results Container -->
+                <div id="resultsContainer" style="display: none;">
+                    <!-- Summary Section -->
+                    <div class="main-card">
+                        <h2><i class="fas fa-chart-pie"></i> Analysis Summary</h2>
+                        <div class="row" id="summaryCards"></div>
+                    </div>
+                    
+                    <!-- Project Charts -->
+                    <div id="projectCharts"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = "{{ url_for('pbc_analyzer.index') }}".replace(/\/$/, '');
+        let currentAnalysisData = null;
+        
+        // Form submission
+        document.getElementById('analysisForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultsContainer').style.display = 'none';
+            document.getElementById('errorContainer').innerHTML = '';
+            
+            fetch(API_BASE + '/analyze_pbc', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    currentAnalysisData = data.analysis_results;
+                    displayResults(data.analysis_results);
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showError('Network error: ' + error.message);
+            });
+        });
+        
+        function showError(message) {
+            document.getElementById('errorContainer').innerHTML = `
+                <div class="main-card">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> <strong>Error:</strong> ${message}
+                    </div>
+                </div>
+            `;
+        }
+        
+        function displayResults(results) {
+            // Display summary
+            displaySummary(results.summary);
+            
+            // Display each project's PBC
+            displayProjectCharts(results.pbc_results);
+            
+            // Show results container
+            document.getElementById('resultsContainer').style.display = 'block';
+        }
+        
+        function displaySummary(summary) {
+            const summaryHtml = `
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <h5><i class="fas fa-project-diagram"></i> Projects Analyzed</h5>
+                        <h2>${summary.total_projects}</h2>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <h5><i class="fas fa-tasks"></i> Total Issues</h5>
+                        <h2>${summary.total_issues_analyzed}</h2>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <h5><i class="fas fa-check-circle"></i> Stable Projects</h5>
+                        <h2>${summary.stable_projects}</h2>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="metric-card">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Unstable Projects</h5>
+                        <h2>${summary.unstable_projects}</h2>
+                    </div>
+                </div>
+            `;
+            document.getElementById('summaryCards').innerHTML = summaryHtml;
+        }
+        
+        function displayProjectCharts(pbcResults) {
+            const container = document.getElementById('projectCharts');
+            container.innerHTML = '';
+            
+            for (const [project, data] of Object.entries(pbcResults)) {
+                if (data.error) {
+                    container.innerHTML += `
+                        <div class="main-card">
+                            <h3>${project}</h3>
+                            <div class="alert alert-warning">${data.error}</div>
+                        </div>
+                    `;
+                    continue;
+                }
+                
+                const projectHtml = createProjectSection(project, data);
+                container.innerHTML += projectHtml;
+                
+                // Create chart after HTML is added
+                setTimeout(() => createChart(project, data), 100);
+            }
+        }
+        
+        function createProjectSection(project, data) {
+            const stability = data.process_stability;
+            const baseline = data.baseline_metrics;
+            const limits = data.control_limits;
+            
+            let statusClass = 'status-stable';
+            if (stability.status === 'unstable') statusClass = 'status-unstable';
+            else if (stability.status === 'needs_attention' || stability.status === 'mostly_stable') statusClass = 'status-warning';
+            
+            // Special causes HTML
+            let specialCausesHtml = '';
+            if (data.special_causes && data.special_causes.length > 0) {
+                specialCausesHtml = '<h5><i class="fas fa-exclamation-triangle"></i> Special Causes Detected:</h5>';
+                data.special_causes.forEach(cause => {
+                    specialCausesHtml += `
+                        <div class="special-cause">
+                            <strong>${cause.month}:</strong> ${cause.message}
+                        </div>
+                    `;
+                });
+            }
+            
+            // Trends HTML
+            let trendsHtml = '';
+            if (data.trends && data.trends.length > 0) {
+                trendsHtml = '<h5><i class="fas fa-chart-line"></i> Trends Detected:</h5>';
+                data.trends.forEach(trend => {
+                    trendsHtml += `
+                        <div class="trend-alert">
+                            <strong>${trend.type === 'increasing' ? '📈' : '📉'}</strong> ${trend.message}
+                        </div>
+                    `;
+                });
+            }
+            
+            return `
+                <div class="main-card">
+                    <h2><i class="fas fa-project-diagram"></i> ${project}</h2>
+                    
+                    <div class="alert ${statusClass}">
+                        <h4><i class="fas fa-heartbeat"></i> Process Stability: ${stability.status.toUpperCase()}</h4>
+                        <p>${stability.message}</p>
+                        <small>Signals detected: ${stability.total_signals} (${stability.special_causes_count} special causes, ${stability.trends_count} trends)</small>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h6>Median Lead Time</h6>
+                                    <h3 class="text-primary">${baseline.median} days</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h6>85th Percentile</h6>
+                                    <h3 class="text-info">${baseline.p85} days</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h6>Upper Control Limit</h6>
+                                    <h3 class="text-danger">${limits.upper} days</h3>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="card text-center">
+                                <div class="card-body">
+                                    <h6>Total Issues</h6>
+                                    <h3>${baseline.total_issues}</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="chart_${project}"></canvas>
+                    </div>
+                    
+                    ${specialCausesHtml}
+                    ${trendsHtml}
+                </div>
+            `;
+        }
+        
+        function createChart(project, data) {
+            const ctx = document.getElementById(`chart_${project}`);
+            if (!ctx) return;
+            
+            const monthlyMetrics = data.monthly_metrics;
+            const labels = monthlyMetrics.map(m => m.month);
+            const means = monthlyMetrics.map(m => m.mean);
+            const medians = monthlyMetrics.map(m => m.median);
+            const p85s = monthlyMetrics.map(m => m.p85);
+            
+            const baseline = data.baseline_metrics;
+            const limits = data.control_limits;
+            
+            // Create arrays for control limits (same value for each month)
+            const ucl = new Array(labels.length).fill(limits.upper);
+            const lcl = new Array(labels.length).fill(limits.lower);
+            const baselineMedian = new Array(labels.length).fill(baseline.median);
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Monthly Mean Lead Time',
+                            data: means,
+                            borderColor: 'rgb(75, 192, 192)',
+                            backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                            borderWidth: 3,
+                            pointRadius: 5,
+                            pointHoverRadius: 7,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Monthly Median',
+                            data: medians,
+                            borderColor: 'rgb(54, 162, 235)',
+                            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            tension: 0.1
+                        },
+                        {
+                            label: '85th Percentile',
+                            data: p85s,
+                            borderColor: 'rgb(255, 159, 64)',
+                            backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            tension: 0.1
+                        },
+                        {
+                            label: 'Upper Control Limit (UCL)',
+                            data: ucl,
+                            borderColor: 'rgb(255, 99, 132)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        },
+                        {
+                            label: 'Lower Control Limit (LCL)',
+                            data: lcl,
+                            borderColor: 'rgb(255, 99, 132)',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            pointRadius: 0,
+                            fill: false
+                        },
+                        {
+                            label: 'Baseline Median',
+                            data: baselineMedian,
+                            borderColor: 'rgb(153, 102, 255)',
+                            borderWidth: 2,
+                            borderDash: [10, 5],
+                            pointRadius: 0,
+                            fill: false
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${project} - Lead Time Process Behavior Chart`,
+                            font: { size: 16 }
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    label += context.parsed.y.toFixed(1) + ' days';
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Lead Time (days)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Month'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

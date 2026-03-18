@@ -1,0 +1,5 @@
+# PBC Analyzer Dependencies
+# All core dependencies are in the root requirements.txt
+# This file is for any application-specific dependencies only
+
+# No additional dependencies required for this application
