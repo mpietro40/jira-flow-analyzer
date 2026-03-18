@@ -1,0 +1,62 @@
+{
+  "base_project": "ISDOP",
+  "excluded_projects": ["E2ECD", "PPB", "KCCS", "TAISS"],
+  "test_mode": {
+    "enabled": false,
+    "test_initiative_id": "ISDOP-526"
+  },
+  "completion_statuses": [
+    "Done", "Closed", "Resolved", "PRD Deployed", "Deployed", "Released",
+    "Completed", "Cancelled", "Abandonned", "To Validate"
+  ],
+  "in_progress_statuses": [
+    "In Progress", "Doing", "Working", "Development", "Estimation",
+    "Work In Progress", "To Test", "Testing", "Code Review",
+    "Ready for Development"
+  ],
+  "issue_types": [
+    "Bug", "Analysis", "Configuration", "Defect (Sub-Task)", "Documentation",
+    "Epic", "Evolution", "Feature", "Improvement", "Incident (Sub-Task)",
+    "Info", "Information", "InvoiceTask", "Story", "Sub-Feature", "Sub-task",
+    "Task", "Technical Improvement", "Technical subtask", "Technical task"
+  ],
+  "flow_metrics_recommendations": {
+    "wip_limits": {
+      "healthy_range": "3-7 items per team member",
+      "warning_threshold": 30,
+      "critical_threshold": 50,
+      "coaching_advice": "High WIP indicates context switching and reduced focus. Consider implementing WIP limits and pull-based workflow."
+    },
+    "throughput": {
+      "target_consistency": "±20% week-over-week variation",
+      "improvement_focus": "Predictable delivery over speed",
+      "coaching_advice": "Erratic throughput suggests process instability. Focus on removing blockers and standardizing work sizing."
+    },
+    "cycle_time": {
+      "healthy_range": "1-14 days for stories",
+      "warning_threshold": 21,
+      "critical_threshold": 40,
+      "coaching_advice": "Long cycle times indicate large work items or process bottlenecks. Break down work and identify constraints."
+    },
+    "work_item_age": {
+      "healthy_range": "0-7 days in any status",
+      "warning_threshold": 14,
+      "critical_threshold": 21,
+      "coaching_advice": "Aging work items suggest blocked or forgotten work. Improve daily scrum and visual management."
+    },
+    "general_recommendations": [
+      "Focus on flow efficiency over resource utilization",
+      "Limit WIP to improve cycle time and quality",
+      "Make work visible through Kanban boards",
+      "Address blockers immediately - they compound over time",
+      "Measure and improve predictability before speed",
+      "Use flow metrics for continuous improvement, not performance evaluation"
+    ],
+    "Explanation": {
+      "Work in Progress": "Number of items currently being worked on but not yet completed. Calculated by counting all issues in 'In Progress' statuses at the end of the PI period. High WIP indicates multitasking and context switching, which reduces team efficiency.",
+      "Items/Week": "Average throughput - number of items completed per week during the PI. Calculated as: Total Completed Items / (PI Duration in Days / 7). Measures team delivery capacity and predictability.",
+      "Avg Work Item Age": "Average time (in days) that Work In Progress items have been active without completion. Calculated from the date each WIP item entered 'In Progress' status until the PI end date. Indicates potential blockers or forgotten work.",
+      "Avg Cycle Time": "Average time (in days) from when work starts until completion for finished items. Calculated as: (Resolution Date - First In Progress Date) for all completed items during PI. Shorter cycle times indicate better flow and faster value delivery."
+    }
+  }
+}

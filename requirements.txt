@@ -2,6 +2,7 @@
 # Core web framework
 Flask==3.0.0
 Werkzeug==3.0.1
+waitress==3.0.0  # Production WSGI server
 
 # HTTP requests for Jira API
 requests==2.31.0

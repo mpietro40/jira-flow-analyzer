@@ -1,0 +1,20 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Build-time dependencies for Jira Analytics Suite
+# Used by setup_and_build.bat to set up a fresh environment from scratch.
+#
+# Install with:
+#   pip install -r requirements-build.txt
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Runtime (same as requirements.txt) ────────────────────────────────────────
+Flask==3.0.0
+Werkzeug==3.0.1
+waitress==3.0.0
+requests==2.31.0
+python-dateutil==2.8.2
+pytz==2023.3
+reportlab==4.0.4
+jira>=3.5.0
+
+# ── Build tool ────────────────────────────────────────────────────────────────
+pyinstaller>=6.0

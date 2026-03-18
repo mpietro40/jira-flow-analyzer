@@ -1,0 +1,16 @@
+{
+  "start_date": "2024-08-01",
+  "default_jql": "project = XXX AND type in (Story, Bug, Task) AND resolved is not EMPTY",
+  "analysis_description": "Process Behavior Charts (PBCs) help identify trends and special causes in lead time metrics using statistical process control. Based on DORA metrics best practices.",
+  "control_chart_info": {
+    "median": "The middle value of all lead times - represents typical performance",
+    "p85": "85th percentile - 85% of issues are completed within this timeframe",
+    "ucl": "Upper Control Limit - 3 standard deviations above mean (natural process limit)",
+    "lcl": "Lower Control Limit - 3 standard deviations below mean (natural process limit)"
+  },
+  "special_cause_rules": [
+    "Single point outside control limits",
+    "Seven or more consecutive points trending up or down",
+    "Eight or more consecutive points on same side of center line"
+  ]
+}
