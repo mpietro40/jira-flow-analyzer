@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCMS Asset Mapping - Complete Report</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 30px 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #003d7a 0%, #005a9c 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 12px;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+        
+        .manager-section {
+            margin-bottom: 50px;
+        }
+        
+        .manager-title {
+            background: linear-gradient(135deg, #005a9c 0%, #003d7a 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+		
+        .alert-title {
+            background: linear-gradient(135deg, #C65a0c 0%, #90Fd9a 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .manager-icon {
+            font-size: 1.3em;
+        }
+        
+        .asset-card {
+            background: white;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-left: 5px solid #003d7a;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .asset-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        
+        .asset-header {
+            margin-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 15px;
+        }
+        
+        .asset-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #003d7a;
+            margin-bottom: 8px;
+        }
+		
+		.asset-name-owner {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #A03d7a;
+            margin-bottom: 8px;
+        }
+        
+        .asset-description {
+            color: #666;
+            font-size: 1.3em;
+        }
+        
+        .asset-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .meta-label {
+            font-weight: bold;
+            color: #003d7a;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+        
+        .meta-value {
+            color: #555;
+            padding: 8px 12px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 1.2em;
+        }
+        
+        .team-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #f0f0f0;
+        }
+        
+        .team-title {
+            font-weight: bold;
+            color: #003d7a;
+            margin-bottom: 12px;
+            font-size: 0.95em;
+        }
+        
+        .team-members {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        
+        .team-member {
+            background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
+            padding: 10px 12px;
+            border-radius: 4px;
+            font-size: 1.1em;
+            color: #333;
+            border-left: 3px solid #005a9c;
+        }
+        .team-member-red {
+            background: linear-gradient(135deg, #F50005 0%, #e8e8e8 100%);
+            padding: 10px 12px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #333;
+            border-left: 3px solid #005a9c;
+        }        
+		
+		.team-member-green {
+            background: linear-gradient(135deg, #00F505 0%, #e8e8e8 100%);
+            padding: 10px 12px;
+            border-radius: 4px;
+            font-size: 0.9em;
+            color: #333;
+            border-left: 3px solid #005a9c;
+        }
+        
+        .empty-team {
+            color: #999;
+            font-style: italic;
+            padding: 10px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-top: 4px solid #003d7a;
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #003d7a;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.95em;
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            margin-top: 40px;
+            font-size: 0.9em;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            .asset-card {
+                page-break-inside: avoid;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .asset-meta {
+                grid-template-columns: 1fr;
+            }
+            .header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🏢 CCMS - Clearing & Card Management Services</h1>
+            <p>Asset Mapping & Incedent Group Team Structure Report</p>
+            <p style="margin-top: 10px; font-size: 0.95em;">Generated: January 29, 2026</p>
+        </div>
+        
+        <!-- Statistics -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number">36</div>
+                <div class="stat-label">Total Assets</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">7</div>
+                <div class="stat-label">Asset Managers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">150+</div>
+                <div class="stat-label">Team Members</div>
+            </div>
+        </div>
+        <div class="manager-section">
+            <div class="alert-title">
+                <span class="manager-icon">👤</span>
+                In red are reported the name we propose to remove from the list.
+				For the list with no more users (after the deletion) we suggest to cancel the list and update the systems (SLINE) with a new list
+            </div>
+		</div>
+        <!-- Pieter Ruts -->
+        <div class="manager-section">
+            <div class="manager-title">
+                <span class="manager-icon">👤</span>
+                Pieter Ruts (Belgium / Central Europe)
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: BE.ACQ.DBO.AS_sn</div>
+                    <div class="asset-name-owner">List change owner group: BE.ACQ.DBO.AS_sn</div>
+                    <div class="asset-description">Application Support Acquiring DBO</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">BE.ACQ.DBO.AS</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member-red">André Masy</div>
+                        <div class="team-member">Andy Walker</div>
+                        <div class="team-member">Baptiste Salvi</div>
+                        <div class="team-member">Bastou Falana</div>
+                        <div class="team-member">Davy Tapin</div>
+                        <div class="team-member">Carmen Brunner</div>
+                        <div class="team-member">Alain Thomas</div>
+                        <div class="team-member">Matthias Ritzheim</div>
+						<div class="team-member-red">Alexandru Aurescu</div>
+                        <div class="team-member-red">Bindulatha Donadula</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.CIBOP.APS_sn</div>
+					<div class="asset-name-owner">List change owner group: GEST.SI_sn</div>
+                    <div class="asset-description">Central Issuing Backoffice - App Support</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.CIBOP.APS</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member-red">Fabrice Foncoux</div>
+                        <div class="team-member">Matthias Ritzheim</div>
+                        <div class="team-member">Bogdan-Cristian Lazar</div>
+                        <div class="team-member-red">Bernard Piret</div>
+                        <div class="team-member">Chinmaya Nithin Dimmiti</div>
+                        <div class="team-member">Fabrice Mangin</div>
+                        <div class="team-member-red">Christian Michelsen</div>
+                        <div class="team-member">Alex Jolly</div>
+                        <div class="team-member-red">Thomas Granzer</div>
+                        <div class="team-member-red">Dhinesh Narayana Murthy</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.CIBOP.HD_sn</div>
+                    <div class="asset-name-owner">List change owner group: FS.CIBOP.APS_sn</div>
+                    <div class="asset-description">Belgian Corporate Service Desk</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.CIBOP.HD</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Gilles Duvivier</div>
+                        <div class="team-member">Myriam Khairallah</div>
+                        <div class="team-member">Catalin Florin Burghiu</div>
+                        <div class="team-member-red">Daniel Garcia Lecloux</div>
+                        <div class="team-member-red">Cyrille Mas</div>
+                        <div class="team-member-red">Cira Kaka</div>
+                        <div class="team-member-red">Ali Kouchkar</div>
+                        <div class="team-member">Ezhilarasan Palanivel</div>
+                        <div class="team-member">Ganesh Shinde</div>
+                        <div class="team-member">Edwin Verzaal</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: BE.ISS.BO.INSTALLER_sn</div>
+                    <div class="asset-name-owner">List change owner group: BE.ISS.MNG_sn</div>
+                    <div class="asset-description">Belgium Issuing Back Office Installer</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">BE.ISS.BO.INSTALLER</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member-red">Ivan Mitevski</div>
+                        <div class="team-member-red">Oliver Uwira</div>
+                        <div class="team-member">Catalin-Florin Militaru</div>
+                        <div class="team-member">Lucas Gauziede</div>
+                        <div class="team-member-red">Etienne Leissner</div>
+                        <div class="team-member-red">Helmut Laupus</div>
+                        <div class="team-member-red">Arthur Fouquet</div>
+                        <div class="team-member-red">Joachim Brückner</div>
+                        <div class="team-member">Hacene Hanouti</div>
+                        <div class="team-member">Francesca Mariani</div>
+						<div class="team-member-green">ADAMACHE MARIUS-TRAIAN</div>
+						
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.CIBOP_GEM.APS_sn</div>
+                    <div class="asset-name-owner">List change owner group: FS.CIBOP.APM_sn</div>
+                    <div class="asset-description">Gemini Application Support team</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.CIBOP_GEM.APS</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Alexandru Aurescu</div>
+                        <div class="team-member-red">Bernard Piret</div>
+                        <div class="team-member">Chinmaya Nithin Dimmiti</div>
+                        <div class="team-member">Fabrice Mangin</div>
+                        <div class="team-member-red">Christian Michelsen</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name" id= "FS.CIBOP.APM_sn">List: FS.CIBOP.APM_sn</div>
+                    <div class="asset-name-owner">List change owner group: FS.CIBOP.APM_sn</div>
+                    <div class="asset-description">Central Issuing Back Office - Application Managed by</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.CIBOP.APM</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Bastou Falana</div>
+                        <div class="team-member">Davy Tapin</div>
+                        <div class="team-member-red">Carmen Brunner</div>
+                        <div class="team-member-red">Alain Thomas</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.NCMS.CMN_sn</div>
+                    <div class="asset-name-owner">List change owner group: FS.NCMS.CMN_sn</div>
+                    <div class="asset-description">Issuing - Card Configuration Manager</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.NCMS.CMN</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Daniele Manzotti</div>
+                        <div class="team-member">Baptiste Salvi</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.PMM_GEM.APS_sn</div>
+                    <div class="asset-name-owner">List change owner group: <a href="#FS.CIBOP.APM_sn">FS.CIBOP.APM_sn<a></div>
+                    <div class="asset-description">PMM on Global Infa App Support</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.PMM_GEM.APS</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Pieter Ruts</div>
+                        <div class="team-member">Brice Haxaire</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.BE_XBOX.INS_sn</div>
+                    <div class="asset-name">List change owner group: FS.BE_XBOX.INS_sn</div>
+                    <div class="asset-description">XBOX Installer</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.BE_XBOX.INS</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Alexander Tschö</div>
+                        <div class="team-member">Gaëtan Mertens</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.CIBOP.IM_sn</div>
+                    <div class="asset-name">List: FS.CIBOP.IM_sn</div>
+                    <div class="asset-description">Central Issuing Backoffice - Incident Manager</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.CIBOP.IM</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Gaëtan Mertens</div>
+                        <div class="team-member">Daniele Manzotti</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: BE.ACQ.DBO.AM_sn</div>
+                    <div class="asset-name">List: BE.ACQ.DBO.AM_sn</div>
+                    <div class="asset-description">Application Manager Acquiring DBO - DO WE NEED THIS?</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">BE.ACQ.DBO.AM</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member-red">André Masy</div>
+                        <div class="team-member-red">Frederic Saelens</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: BE.BO.INSTALLER_sn</div>
+                    <div class="asset-name">List: BE.BO.INSTALLER_sn</div>
+                    <div class="asset-description">Belgium Installer Back Office for Prod environment - DO WE NEED THIS?</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pieter Ruts</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">BE.BO.INSTALLER</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Emilien Contour</div>
+                        <div class="team-member-red">Francesco Cimino</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Matthias Ritzheim -->
+        <div class="manager-section">
+            <div class="manager-title">
+                <span class="manager-icon">👤</span>
+                Matthias Ritzheim (Germany)
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: GER.FFM.TSO.BA.PS_sn</div>
+                    <div class="asset-name">List: GER.FFM.TSO.BA.PS_sn</div>
+                    <div class="asset-description">Germany TSO Product/Services</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Matthias Ritzheim</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">GER.FFM.TSO.BA.PS</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member-red">Bindulatha Donadula</div>
+                        <div class="team-member">Bhagya Veena Velaga</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FPL.DE_ISSUING_CORE_JAVA.DEV_sn</div>
+                    <div class="asset-name">List: FPL.DE_ISSUING_CORE_JAVA.DEV_sn</div>
+                    <div class="asset-description">Development CMS Satellites (Java)</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Matthias Ritzheim</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FPL.DE_ISSUING_CORE_JAVA.DEV</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member-red">Francesco Cimino</div>
+                        <div class="team-member">Bogdan-Cristian Lazar</div>
+                        <div class="team-member-red">Bernard Piret</div>
+                        <div class="team-member">Chinmaya Nithin Dimmiti</div>
+                        <div class="team-member">Fabrice Mangin</div>
+                        <div class="team-member-red">Christian Michelsen</div>
+                        <div class="team-member">Alex Jolly</div>
+                        <div class="team-member-red">Thomas Granzer</div>
+                        <div class="team-member-red">Dhinesh Narayana Murthy</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: GER.FFM.TSO.VALIDATOR_sn</div>
+                    <div class="asset-name">List: GER.FFM.TSO.VALIDATOR_sn</div>
+                    <div class="asset-description">TSO validator</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Matthias Ritzheim</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">GER.FFM.TSO.VALIDATOR</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member-red">Cira Kaka</div>
+                        <div class="team-member-red">Ali Kouchkar</div>
+                        <div class="team-member">Ezhilarasan Palanivel</div>
+                        <div class="team-member">Ganesh Shinde</div>
+                        <div class="team-member">Edwin Verzaal</div>
+                        <div class="team-member">Daniel Garcia Lecloux</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: DE.WOZILLA_sn</div>
+                    <div class="asset-name">List: DE.WOZILLA_sn</div>
+                    <div class="asset-description">Wozilla</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Matthias Ritzheim</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">DE.WOZILLA</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Matthias Ritzheim</div>
+                        <div class="team-member">Jyotirmoy Raychoudhury</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: DE.SD.CARDMANAGEMENT.ONCALL_sn</div>
+                    <div class="asset-name">List: DE.SD.CARDMANAGEMENT.ONCALL_sn</div>
+                    <div class="asset-description">Development Cardmanagement System OnCall</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Matthias Ritzheim</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">DE.SD.CARDMANAGEMENT.ONCALL</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member-red">Bindulatha Donadula</div>
+                        <div class="team-member">Bhagya Veena Velaga</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FPL.DE_NS.BATCH.APS_sn</div>
+                    <div class="asset-name">List: FPL.DE_NS.BATCH.APS_sn</div>
+                    <div class="asset-description">Batch operations Germany</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Matthias Ritzheim</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FPL.DE_NS.BATCH.APS</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Petrisor Arinton</div>
+                        <div class="team-member">Dimitri Klein</div>
+                        <div class="team-member">Detlef Lorch</div>
+                        <div class="team-member">Fatih Tanriverdi</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FPL.DE_ISSUING_CORE.ANL_sn</div>
+                    <div class="asset-name">List: FPL.DE_ISSUING_CORE.ANL_sn</div>
+                    <div class="asset-description">Issuing PLUS - CAMS - Backoffice Specific Products Germany</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Matthias Ritzheim</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FPL.DE_ISSUING_CORE.ANL</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Andreas Böhme</div>
+                        <div class="team-member">Adarsh Pande</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FPL.DE_ISSUING_CORE.DEV_sn</div>
+                    <div class="asset-name">List: FPL.DE_ISSUING_CORE.DEV_sn</div>
+                    <div class="asset-description">Issuing PLUS - CAMS - Backoffice Core Product</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Matthias Ritzheim</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FPL.DE_ISSUING_CORE.DEV</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Matthias Ritzheim</div>
+                        <div class="team-member">Werner Lauter</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: GER.TSO.AOC.VAL_sn</div>
+                    <div class="asset-name">List: GER.TSO.AOC.VAL_sn</div>
+                    <div class="asset-description">AOC TSO Validator</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Matthias Ritzheim</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">GER.TSO.AOC.VAL</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Kristina Soth</div>
+                        <div class="team-member">Joachim Brückner</div>
+                        <div class="team-member">Shaun Jacobs</div>
+                        <div class="team-member">Peter Grimm</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: GER.FFM.TSO.AOC_sn</div>
+                    <div class="asset-name">List: GER.FFM.TSO.AOC_sn</div>
+                    <div class="asset-description">TSO für Aplication Output Control</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Matthias Ritzheim</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">GER.FFM.TSO.AOC</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Serena Rigamonti</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.DE_IP-CORE.SYS_sn</div>
+                    <div class="asset-name">List: FS.DE_IP-CORE.SYS_sn</div>
+                    <div class="asset-description">Sempris Core Support</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Matthias Ritzheim</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.DE_IP-CORE.SYS</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Petrisor Arinton</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pierre Schmitt & Davy Tapin & Stephane Provot & Daniele Manzotti & Riccardo Frigeni -->
+        <div class="manager-section">
+            <div class="manager-title">
+                <span class="manager-icon">👤</span>
+                Pierre Schmitt (Luxembourg)
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.LU_ISSUING_BO.DEV_sn</div>
+                    <div class="asset-name">List: FS.LU_ISSUING_BO.DEV_sn</div>
+                    <div class="asset-description">BO DEV</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pierre Schmitt</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.LU_ISSUING_BO.DEV</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Baptiste Salvi</div>
+                        <div class="team-member">Pierre Schmitt</div>
+                        <div class="team-member">Harikrishna Gauribidanur Narayanappa</div>
+                        <div class="team-member">Wolfgang Zwer</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.LU_ISSUING_PERSO.APM_sn</div>
+                    <div class="asset-name">List: FS.LU_ISSUING_PERSO.APM_sn</div>
+                    <div class="asset-description">Pegasus back office for Card personnalisation</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Pierre Schmitt</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.LU_ISSUING_PERSO.APM</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Brice Haxaire</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="manager-section">
+            <div class="manager-title">
+                <span class="manager-icon">👤</span>
+                Davy Tapin (Luxembourg)
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.LU_ISSUING_BO.CHM_sn</div>
+                    <div class="asset-name">List: FS.LU_ISSUING_BO.CHM_sn</div>
+                    <div class="asset-description">BO Change Management</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Davy Tapin</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.LU_ISSUING_BO.CHM</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Davy Tapin</div>
+                        <div class="team-member">Christian Schuhmacher</div>
+                        <div class="team-member">Andreas Böhme</div>
+                        <div class="team-member">Blerim Shala</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: FS.LU_ISSUING_BO.APM_sn</div>
+                    <div class="asset-name">List: FS.LU_ISSUING_BO.APM_sn</div>
+                    <div class="asset-description">Pegasus back office products</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Davy Tapin</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">FS.LU_ISSUING_BO.APM</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Baptiste Salvi</div>
+                        <div class="team-member">Pieter Ruts</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="manager-section">
+            <div class="manager-title">
+                <span class="manager-icon">👤</span>
+                Stephane Provot (France)
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: GA.CHEQUEDEJEUNER_sn</div>
+                    <div class="asset-name">List: GA.CHEQUEDEJEUNER_sn</div>
+                    <div class="asset-description">Gestion d'application Chèque Déjeuner</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Stephane Provot</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">GA.CHEQUEDEJEUNER</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Alain Thomas</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="Managed by-section">
+            <div class="manager-title">
+                <span class="manager-icon">👤</span>
+                Daniele Manzotti (Italy Operations)
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_sn</div>
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_sn</div>
+                    <div class="asset-description">ops_pci_iss_bo_tm1</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Daniele Manzotti</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">ops_pci_iss_bo_tm1</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">André Masy</div>
+                        <div class="team-member">Daniele Pastore</div>
+                        <div class="team-member">Edwin Verzaal</div>
+                        <div class="team-member">Daniele Manzotti</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_cams_sn</div>
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_cams_sn</div>
+                    <div class="asset-description">CAMS ITALY OPS Team</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Daniele Manzotti</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">ops_pci_iss_bo_tm1_cams</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Daniele Manzotti</div>
+                        <div class="team-member">Alessandra Soldati</div>
+                        <div class="team-member">Antonio Menici</div>
+                        <div class="team-member">Hubert van Helvoort</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="manager-section">
+            <div class="manager-title">
+                <span class="manager-icon">👤</span>
+                Riccardo Frigeni (Italy Operations)
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_cops_sn</div>
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_cops_sn</div>
+                    <div class="asset-description">ops_pci_iss_bo_tm1_cops</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Riccardo Frigeni</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">ops_pci_iss_bo_tm1_cops</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Riccardo Frigeni</div>
+                        <div class="team-member">Michel Bouma</div>
+                        <div class="team-member">Francesca Mariani</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_ibo_sn</div>
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_ibo_sn</div>
+                    <div class="asset-description">ops_pci_iss_bo_tm1_ibo</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Riccardo Frigeni</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">ops_pci_iss_bo_tm1_ibo</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Danilo Papa</div>
+                        <div class="team-member">Gerard Lankheet</div>
+                        <div class="team-member">Daniele Pastore</div>
+                        <div class="team-member">Angelo Maddaluno</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_sicu_sn</div>
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_sicu_sn</div>
+                    <div class="asset-description">ops_pci_iss_bo_tm1_sicu</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Riccardo Frigeni</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">ops_pci_iss_bo_tm1_sicu</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Ciriaco Vitillo</div>
+                        <div class="team-member">Lesley Au</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: ops_cartasi_interaction_cards_sn</div>
+                    <div class="asset-name">List: ops_cartasi_interaction_cards_sn</div>
+                    <div class="asset-description">ops_cartasi_interaction_cards</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Riccardo Frigeni</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">ops_cartasi_interaction_cards</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Claudia Castellani</div>
+                        <div class="team-member">Francesca Mariani</div>
+                        <div class="team-member">Pieter Kevie</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_gec_sn</div>
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_gec_sn</div>
+                    <div class="asset-description">ops_pci_iss_bo_tm1_gec</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Riccardo Frigeni</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">ops_pci_iss_bo_tm1_gec</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Mattia Storti</div>
+                        <div class="team-member">Davide Corno</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="asset-card">
+                <div class="asset-header">
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_rs_sn</div>
+                    <div class="asset-name">List: ops_pci_iss_bo_tm1_rs_sn</div>
+                    <div class="asset-description">ops_pci_iss_bo_tm1_rs</div>
+                </div>
+                <div class="asset-meta">
+                    <div class="meta-item">
+                        <div class="meta-label">Managed by</div>
+                        <div class="meta-value">Riccardo Frigeni</div>
+                    </div>
+                    <div class="meta-item">
+                        <div class="meta-label">CI User Group</div>
+                        <div class="meta-value">ops_pci_iss_bo_tm1_rs</div>
+                    </div>
+                </div>
+                <div class="team-section">
+                    <div class="team-title">👥 Team Members:</div>
+                    <div class="team-members">
+                        <div class="team-member">Riccardo Frigeni</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>CCMS - Clearing & Card Management Services</strong></p>
+            <p>Complete Asset Mapping & Team Structure Report | Generated January 29, 2026</p>
+        </div>
+    </div>
+</body>
+</html>

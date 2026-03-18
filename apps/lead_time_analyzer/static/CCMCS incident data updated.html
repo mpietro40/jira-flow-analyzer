@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CCMS Asset Mapping - Corrected Report</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 30px 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #003d7a 0%, #005a9c 100%);
+            color: white;
+            padding: 40px;
+            border-radius: 12px;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            margin-bottom: 40px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        thead {
+            background: linear-gradient(135deg, #003d7a 0%, #005a9c 100%);
+            color: white;
+            position: sticky;
+            top: 0;
+        }
+        
+        thead th {
+            padding: 18px 15px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #005a9c;
+            font-size: 0.95em;
+        }
+        
+        tbody tr {
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        tbody tr:nth-child(odd) {
+            background-color: #f9f9f9;
+        }
+        
+        tbody tr:nth-child(even) {
+            background-color: #ffffff;
+        }
+        
+        tbody tr:hover {
+            background-color: #f0f8ff;
+        }
+        
+        td {
+            padding: 15px;
+            border: 1px solid #e0e0e0;
+            font-size: 0.95em;
+        }
+        
+		.manager-section {
+            margin-bottom: 50px;
+        }
+		
+        .manager-title {
+            background: linear-gradient(135deg, #005a9c 0%, #003d7a 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+		        
+		.alert-title {
+            background: linear-gradient(135deg, #C65a0c 0%, #90Fd9a 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 1.0em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .asset-name {
+            font-weight: 600;
+            color: #003d7a;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .asset-desc {
+            color: #555;
+            font-size: 0.9em;
+        }
+        
+        .manager-name {
+            font-weight: 600;
+            color: #005a9c;
+        }
+        
+        .group-id {
+            font-family: 'Courier New', monospace;
+            color: #666;
+            font-size: 0.9em;
+        }
+        
+        .users-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .user-badge {
+            background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            border-left: 3px solid #005a9c;
+            color: #003d7a;
+            font-weight: 500;
+        }
+        
+        .user-badge-red {
+            background: linear-gradient(135deg, #F50005 0%, #bbdefb 100%);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            border-left: 3px solid #005a9c;
+            color: #003d7a;
+            font-weight: 500;
+        }
+                
+        .user-badge-gray {
+            background: linear-gradient(135deg, #777777 0%, #bbdefb 100%);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            border-left: 3px solid #005a9c;
+            color: #003d7a;
+            font-weight: 500;
+        }
+        
+        .empty-users {
+            color: #999;
+            font-style: italic;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border-top: 4px solid #003d7a;
+        }
+        
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #003d7a;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.95em;
+        }
+        
+        .footer {
+            text-align: center;
+            color: white;
+            padding: 20px;
+            margin-top: 40px;
+            font-size: 0.9em;
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            table {
+                page-break-inside: avoid;
+            }
+        }
+        
+        @media (max-width: 1200px) {
+            table {
+                font-size: 0.85em;
+            }
+            td, th {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🏢 CCMS - Clearing & Card Management Services</h1>
+            <p>Asset Mapping Report with Team Structure</p>
+            <p style="margin-top: 10px; font-size: 0.95em;">Generated: January 29, 2026</p>
+        </div>
+        
+        <!-- Statistics -->
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number">36</div>
+                <div class="stat-label">Total Assets</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">7</div>
+                <div class="stat-label">Asset Managers</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number">150+</div>
+                <div class="stat-label">Team Members</div>
+            </div>
+        </div>
+        <div class="manager-section">
+            <div class="alert-title">
+                <span class="manager-icon">👤</span>
+                In red are reported the name we propose to remove from the list.
+				For the list with no more users (after the deletion) we suggest to cancel the list and update the systems (SLINE) with a new list
+            </div>
+		</div>
+        <!-- Main Table -->
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 12%;">Asset Name</th>
+                    <th style="width: 20%;">Description</th>
+                    <th style="width: 12%;">Managed By</th>
+                    <th style="width: 15%;">Managed By Group</th>
+                    <th style="width: 41%;">Team Members</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- BE.ACQ.DBO.AS_sn -->
+                <tr>
+                    <td class="asset-name">BE.ACQ.DBO.AS_sn</td>
+                    <td class="asset-desc">Application Support Acquiring DBO</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">BE.ACQ.CDB.AS_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">André Masy</span>
+                            <span class="user-badge">Andy Walker</span>
+                            <span class="user-badge">Blerim Shala</span>
+                            <span class="user-badge">Didier Trouveroy</span>
+                            <span class="user-badge">Eric Ponet</span>
+                            <span class="user-badge">Fatih Tanriverdi</span>
+                            <span class="user-badge">Nadine Toussaint</span>
+                            <span class="user-badge">Patrick Lethé</span>
+                            <span class="user-badge">Pieter Ruts</span>
+                            <span class="user-badge">Wico van Heijzen</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.CIBOP.APS_sn -->
+                <tr>
+                    <td class="asset-name">FS.CIBOP.APS_sn</td>
+                    <td class="asset-desc">Central Issuing Backoffice - App Support</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">GEST.SI_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge-red">Ali Chaouche</span>
+                            <span class="user-badge">Bastou Falana</span>
+                            <span class="user-badge">Blerim Shala</span>
+                            <span class="user-badge">Didier Trouveroy</span>
+                            <span class="user-badge">Fabien Coustaury</span>
+                            <span class="user-badge">Fatih Tanriverdi</span>
+                            <span class="user-badge">Franck Huet</span>
+                            <span class="user-badge">Gaëtan Mertens</span>
+                            <span class="user-badge">Hacene Hanouti</span>
+                            <span class="user-badge">Henri Ruelle</span>
+                            <span class="user-badge">Jalle Moors</span>
+                            <span class="user-badge">Jean-Pierre Bakker</span>
+                            <span class="user-badge">Kristof Rogge</span>
+                            <span class="user-badge">Nadine Toussaint</span>
+                            <span class="user-badge">Patrick Lethé</span>
+                            <span class="user-badge">Philippe Mottin</span>
+                            <span class="user-badge">Pieter Ruts</span>
+                            <span class="user-badge">Wico van Heijzen</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.CIBOP.HD_sn -->
+                <tr>
+                    <td class="asset-name">FS.CIBOP.HD_sn</td>
+                    <td class="asset-desc">Belgian Corporate Service Desk</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">FS.CIBOP.APS_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="empty-users">No specific team members listed</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- GER.FFM.TSO.BA.PS_sn -->
+                <tr>
+                    <td class="asset-name">GER.FFM.TSO.BA.PS_sn</td>
+                    <td class="asset-desc">Germany TSO Product/Services</td>
+                    <td class="manager-name">Matthias Ritzheim</td>
+                    <td class="group-id">DE.CHANGEMANAGER_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge-red">Christian Michelsen</span>
+                            <span class="user-badge-red">Cira Kaka</span>
+                            <span class="user-badge-red">Doerte Johnsen</span>
+                            <span class="user-badge-gray">Gregor Sander</span>
+                            <span class="user-badge-gray">Hans-Joachim Meyer</span>
+                            <span class="user-badge-red">Klaus-Peter Weinreich</span>
+                            <span class="user-badge">Kristina Soth</span>
+                            <span class="user-badge-red">Lale Ayisigi</span>
+                            <span class="user-badge">Markus Ganz</span>
+                            <span class="user-badge-gray">Oliver Uwira</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- BE.ISS.BO.INSTALLER_sn -->
+                <tr>
+                    <td class="asset-name">BE.ISS.BO.INSTALLER_sn</td>
+                    <td class="asset-desc">Belgium Issuing Back Office Installer</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">BE.ISS.MNG_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Emilien Contour</span>
+                            <span class="user-badge-red">Fabrice Foncoux</span>
+                            <span class="user-badge">Gilles Duvivier</span>
+                            <span class="user-badge-red">Ivan Mitevski</span>
+                            <span class="user-badge">Jalle Moors</span>
+                            <span class="user-badge">Laurent Chabot</span>
+                            <span class="user-badge">Nadine Toussaint</span>
+                            <span class="user-badge">Philippe Mottin</span>
+                            <span class="user-badge-red">Svetlin Rusenov</span>
+                            <span class="user-badge">Wico van Heijzen</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FPL.DE_ISSUING_CORE_JAVA.DEV_sn -->
+                <tr>
+                    <td class="asset-name">FPL.DE_ISSUING_CORE_JAVA.DEV_sn</td>
+                    <td class="asset-desc">Development CMS Satellites (Java)</td>
+                    <td class="manager-name">Matthias Ritzheim</td>
+                    <td class="group-id">FPL.DE_ISSUING_CORE_JAVA.DEV_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge-red">Francesco Cimino</span>
+                            <span class="user-badge">Matthias Ritzheim</span>
+                            <span class="user-badge-red">Myriam Khairallah</span>
+                            <span class="user-badge-gray">Oliver Uwira</span>
+                            <span class="user-badge">Pedro Perez</span>
+                            <span class="user-badge-red">Thomas Granzer</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.CIBOP_GEM.APS_sn -->
+                <tr>
+                    <td class="asset-name">FS.CIBOP_GEM.APS_sn</td>
+                    <td class="asset-desc">Gemini Application Support team</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">FS.CIBOP.APM_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge-red">Alexandru Aurescu</span>
+                            <span class="user-badge">Bogdan-Cristian Lazar</span>
+                            <span class="user-badge">Catalin Florin Burghiu</span>
+                            <span class="user-badge">Catalin-Florin Militaru</span>
+                            <span class="user-badge">Dominic Gabriel Cheroiu</span>
+                            <span class="user-badge-red">Feliks Paytyan</span>
+                            <span class="user-badge">Felix Maracinescu</span>
+                            <span class="user-badge">Leela Manikanta Veeranki</span>
+                            <span class="user-badge">Marius-Traian Adamache</span>
+                            <span class="user-badge">Mihail Stan</span>
+                            <span class="user-badge">Pieter Ruts</span>
+                            <span class="user-badge">Rafal Gebski</span>
+                            <span class="user-badge">Rares-Andrei Ialomiteanu</span>
+                            <span class="user-badge">Renaud Pesty</span>
+                            <span class="user-badge">Salvatore de Rosa</span>
+                            <span class="user-badge">Simona Stefanescu</span>
+                            <span class="user-badge">Vasco Fernandes</span>
+                            <span class="user-badge">Wico van Heijzen</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.LU_ISSUING_BO.DEV_sn -->
+                <tr>
+                    <td class="asset-name">FS.LU_ISSUING_BO.DEV_sn</td>
+                    <td class="asset-desc">BO DEV</td>
+                    <td class="manager-name">Pierre Schmitt</td>
+                    <td class="group-id">CTO.LU_OP.CMN_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Baptiste Salvi</span>
+                            <span class="user-badge-red">Bernard Piret</span>
+                            <span class="user-badge-red">Daniel Garcia Lecloux</span>
+                            <span class="user-badge">Lucas Gauziede</span>
+                            <span class="user-badge">Olivier Penz</span>
+                            <span class="user-badge">Philippe Zappa</span>
+                            <span class="user-badge">Pierre Schmitt</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.CIBOP.APM_sn -->
+                <tr>
+                    <td class="asset-name">FS.CIBOP.APM_sn</td>
+                    <td class="asset-desc">Central Issuing Back Office - Application Manager</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">FS.CIBOP.APM_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Bastou Falana</span>
+                            <span class="user-badge">Chinmaya Nithin Dimmiti</span>
+                            <span class="user-badge">Cyrille Mas</span>
+                            <span class="user-badge-red">Etienne Leissner</span>
+                            <span class="user-badge-gray">Franck Lange</span>
+                            <span class="user-badge">Gaëtan Mertens</span>
+                            <span class="user-badge">Harikrishna Gauribidanur Narayanappa</span>
+                            <span class="user-badge">Jacopo Andrea Lippolis</span>
+                            <span class="user-badge">Jalle Moors</span>
+                            <span class="user-badge">Jean-Pierre Bakker</span>
+                            <span class="user-badge-gray">Jean-Philippe Bodin</span>
+                            <span class="user-badge">Kristof Rogge</span>
+                            <span class="user-badge">Laura Castiglia</span>
+                            <span class="user-badge">Philippe Mottin</span>
+                            <span class="user-badge">Pieter Ruts</span>
+                            <span class="user-badge">Rafal Gebski</span>
+                            <span class="user-badge">Rushitha Gundoji</span>
+                            <span class="user-badge">Vasco Fernandes</span>
+                            <span class="user-badge">Wico van Heijzen</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.LU_ISSUING_BO.CHM_sn -->
+                <tr>
+                    <td class="asset-name">FS.LU_ISSUING_BO.CHM_sn</td>
+                    <td class="asset-desc">BO Change Management</td>
+                    <td class="manager-name">Davy Tapin</td>
+                    <td class="group-id">CTO.LU_OP.CMN_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Davy Tapin</span>
+                            <span class="user-badge">Fabrice Mangin</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- GER.FFM.TSO.VALIDATOR_sn -->
+                <tr>
+                    <td class="asset-name">GER.FFM.TSO.VALIDATOR_sn</td>
+                    <td class="asset-desc">TSO validator</td>
+                    <td class="manager-name">Matthias Ritzheim</td>
+                    <td class="group-id">GER.FFM.TSO.VALIDATOR_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Carmen Brunner</span>
+                            <span class="user-badge-red">Christian Michelsen</span>
+                            <span class="user-badge-red">Cira Kaka</span>
+                            <span class="user-badge-red">Helmut Laupus</span>
+                            <span class="user-badge">Matthias Ritzheim</span>
+                            <span class="user-badge-gray">Oliver Uwira</span>
+                            <span class="user-badge">Wolfgang Zwer</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- GA.CHEQUEDEJEUNER_sn -->
+                <tr>
+                    <td class="asset-name">GA.CHEQUEDEJEUNER_sn</td>
+                    <td class="asset-desc">Gestion d'application Chèque Déjeuner</td>
+                    <td class="manager-name">Stephane Provot</td>
+                    <td class="group-id">GA.CHEQUEDEJEUNER_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge-red">Alain Thomas</span>
+                            <span class="user-badge">Alex Jolly</span>
+                            <span class="user-badge-red">Ali Kouchkar</span>
+                            <span class="user-badge-red">Arthur Fouquet</span>
+                            <span class="user-badge">Benoit Pilleboue</span>
+                            <span class="user-badge">Cedric Sotteau</span>
+                            <span class="user-badge-red">Christophe Dion</span>
+                            <span class="user-badge-gray">Corinne Meunier</span>
+                            <span class="user-badge">Denis Eldin</span>
+                            <span class="user-badge-red">Dominique Harrouet</span>
+                            <span class="user-badge-red">Estelle Criton</span>
+                            <span class="user-badge">Fabrice Godard</span>
+                            <span class="user-badge">Gaetan Esteve</span>
+                            <span class="user-badge">Gaetan Gouliere</span>
+                            <span class="user-badge">Herve Richen</span>
+                            <span class="user-badge">Ivan Metallaoui</span>
+                            <span class="user-badge">Isabelle Petrault</span>
+                            <span class="user-badge">Julien Monteil</span>
+                            <span class="user-badge">Karine Delauriere</span>
+                            <span class="user-badge">Ludovic Renon</span>
+                            <span class="user-badge">Marc Pedeux</span>
+                            <span class="user-badge">Marie Christine Leple</span>
+                            <span class="user-badge-red">Maryse Despre</span>
+                            <span class="user-badge">Myriam Guillemard</span>
+                            <span class="user-badge">Rodolphe Servais</span>
+                            <span class="user-badge">Sandra Desport</span>
+                            <span class="user-badge">Stephane Provot</span>
+                            <span class="user-badge">Vanessa le Badezet</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- DE.WOZILLA_sn -->
+                <tr>
+                    <td class="asset-name">DE.WOZILLA_sn</td>
+                    <td class="asset-desc">Wozilla</td>
+                    <td class="manager-name">Matthias Ritzheim</td>
+                    <td class="group-id">DE.WOZILLA_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Matthias Ritzheim</span>
+                            <span class="user-badge-red">Thomas Granzer</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- DE.SD.CARDMANAGEMENT.ONCALL_sn -->
+                <tr>
+                    <td class="asset-name">DE.SD.CARDMANAGEMENT.ONCALL_sn</td>
+                    <td class="asset-desc">Development Cardmanagement System OnCall</td>
+                    <td class="manager-name">Matthias Ritzheim</td>
+                    <td class="group-id">DE.SD.CARDMANAGEMENT.ONCALL_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge-red">Bindulatha Donadula</span>
+                            <span class="user-badge-gray">Dhinesh Narayana Murthy</span>
+                            <span class="user-badge">Ezhilarasan Palanivel</span>
+                            <span class="user-badge-red">Joachim Brückner</span>
+							<span class="user-badge">Joachim Lücking</span>
+                            <span class="user-badge-red">Michael Empacher</span>
+                            <span class="user-badge-gray">Oliver Uwira</span>
+                            <span class="user-badge-red">Richard Wroblewski</span>
+                            <span class="user-badge">Udo Sommer</span>
+                            <span class="user-badge">Ulrich Stamm</span>
+                            <span class="user-badge">Waldemar Albrecht</span>
+							<span class="user-badge-red">Wolfgang Ranft</span>
+							
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FPL.DE_NS.BATCH.APS_sn -->
+                <tr>
+                    <td class="asset-name">FPL.DE_NS.BATCH.APS_sn</td>
+                    <td class="asset-desc">Batch operations Germany</td>
+                    <td class="manager-name">Matthias Ritzheim</td>
+                    <td class="group-id">FPL.DE_NS.BATCH.APS_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Bhagya Veena Velaga</span>
+                            <span class="user-badge">Chinmaya Nithin Dimmiti</span>
+                            <span class="user-badge">Ganesh Shinde</span>
+                            <span class="user-badge">Hacene Hanouti</span>
+                            <span class="user-badge">Harikrishna Gauribidanur Narayanappa</span>
+                            <span class="user-badge">Jyotirmoy Raychoudhury</span>
+                            <span class="user-badge">Laura Castiglia</span>
+                            <span class="user-badge">Lukasz Kacki</span>
+                            <span class="user-badge">Matthias Ritzheim</span>
+                            <span class="user-badge">Michal Leszkiewicz</span>
+                            <span class="user-badge">Omkar Ketkar</span>
+                            <span class="user-badge">Pieter Ruts</span>
+                            <span class="user-badge">Piotr Rutkowski</span>
+                            <span class="user-badge">Ram Bondre</span>
+                            <span class="user-badge">Ravi Teja Manam</span>
+                            <span class="user-badge">Rushitha Gundoji</span>
+                            <span class="user-badge">Salvatore de Rosa</span>
+                            <span class="user-badge">Sonal Chidrawar</span>
+                            <span class="user-badge">Varsha Athawale</span>
+                            <span class="user-badge">Vasco Fernandes</span>
+                            <span class="user-badge">Wico van Heijzen</span>
+                            <span class="user-badge">Yalcin Avsar</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.NCMS.CMN_sn -->
+                <tr>
+                    <td class="asset-name">FS.NCMS.CMN_sn</td>
+                    <td class="asset-desc">Issuing - Card Configuration Manager</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">-</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="empty-users">No specific team members listed</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- ops_pci_iss_bo_tm1_sn -->
+                <tr>
+                    <td class="asset-name">ops_pci_iss_bo_tm1_sn</td>
+                    <td class="asset-desc">ops_pci_iss_bo_tm1</td>
+                    <td class="manager-name">Daniele Manzotti</td>
+                    <td class="group-id">gsm_gov_information_systems_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Daniele Manzotti</span>
+                            <span class="user-badge-red">Daniele Pastore</span>
+                            <span class="user-badge">Edwin Verzaal</span>
+                            <span class="user-badge">Francesca Mariani</span>
+                            <span class="user-badge-red">Hubert van Helvoort</span>
+                            <span class="user-badge-red">Riccardo Frigeni</span>
+                            <span class="user-badge-red">Robert van der Velden</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.LU_ISSUING_BO.APM_sn -->
+                <tr>
+                    <td class="asset-name">FS.LU_ISSUING_BO.APM_sn</td>
+                    <td class="asset-desc">Pegasus back office products</td>
+                    <td class="manager-name">Davy Tapin</td>
+                    <td class="group-id">CTO.LU_OP.CMN_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Baptiste Salvi</span>
+                            <span class="user-badge">Brice Haxaire</span>
+                            <span class="user-badge-red">Daniel Garcia Lecloux</span>
+                            <span class="user-badge">Davy Tapin</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.PMM_GEM.APS_sn -->
+                <tr>
+                    <td class="asset-name">FS.PMM_GEM.APS_sn</td>
+                    <td class="asset-desc">PMM on Global Infa App Support</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">FS.CIBOP.APM_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Pieter Ruts</span>
+                            <span class="user-badge">Rares-Andrei Ialomiteanu</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.LU_ISSUING_PERSO.APM_sn -->
+                <tr>
+                    <td class="asset-name">FS.LU_ISSUING_PERSO.APM_sn</td>
+                    <td class="asset-desc">Pegasus back office for Card personnalisation</td>
+                    <td class="manager-name">Pierre Schmitt</td>
+                    <td class="group-id">CTO.LU_OP.CMN_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Brice Haxaire</span>
+                            <span class="user-badge">Céline de Santis</span>
+                            <span class="user-badge">Davy Tapin</span>
+                            <span class="user-badge">Philippe Scharff</span>
+                            <span class="user-badge">Sabrina Schwarz</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FPL.DE_ISSUING_CORE.ANL_sn -->
+                <tr>
+                    <td class="asset-name">FPL.DE_ISSUING_CORE.ANL_sn</td>
+                    <td class="asset-desc">Issuing PLUS - CAMS - Backoffice Specific Products Germany</td>
+                    <td class="manager-name">Matthias Ritzheim</td>
+                    <td class="group-id">FPL.DE_ISSUING_CORE.ANL_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Andreas Böhme</span>
+                            <span class="user-badge-red">Astrid Schuth</span>
+                            <span class="user-badge-red">Christian Schuhmacher</span>
+                            <span class="user-badge-red">Dimitri Klein</span>
+                            <span class="user-badge-red">Diana Seefeldt</span>
+                            <span class="user-badge-gray">Dhinesh Narayana Murthy</span>
+                            <span class="user-badge-red">Joachim Brückner</span>
+                            <span class="user-badge-red">Kay Hoese</span>
+                            <span class="user-badge">Kristina Soth</span>
+                            <span class="user-badge-red">Leonid Ravin</span>
+                            <span class="user-badge">Manuela Ohly</span>
+							<span class="user-badge">Matthias Ritzheim</span>
+                            <span class="user-badge">Michael Soltau</span>
+                            <span class="user-badge-gray">Oliver Uwira</span>
+                            <span class="user-badge">Rajesh Boddepalli</span>
+                            <span class="user-badge">Ratika Sharma</span>
+                            <span class="user-badge-red">Sabine Dreher</span>
+                            <span class="user-badge-gray">Thomas Richter</span>
+                            <span class="user-badge-red">Torben Winter</span>
+                            <span class="user-badge">Udo Sommer</span>
+                            <span class="user-badge">Waldemar Albrecht</span>
+                            <span class="user-badge">Werner Lauter</span>
+                            <span class="user-badge-red">Wolfgang Ranft</span>
+                            <span class="user-badge-red">Xiaodong Qi</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FPL.DE_ISSUING_CORE.DEV_sn -->
+                <tr>
+                    <td class="asset-name">FPL.DE_ISSUING_CORE.DEV_sn</td>
+                    <td class="asset-desc">Issuing PLUS - CAMS - Backoffice Core Product</td>
+                    <td class="manager-name">Matthias Ritzheim</td>
+                    <td class="group-id">FPL.DE_ISSUING_CORE.DEV_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Adarsh Pande</span>
+                            <span class="user-badge-red">Alexander Tschö</span>
+                            <span class="user-badge">Andreas Böhme</span>
+                            <span class="user-badge-red">Bindulatha Donadula</span>
+                            <span class="user-badge">Claudia Menzel</span>
+                            <span class="user-badge">Detlef Lorch</span>
+                            <span class="user-badge-gray">Dhinesh Narayana Murthy</span>
+                            <span class="user-badge">Ezhilarasan Palanivel</span>
+                            <span class="user-badge">Joachim Lücking</span>
+                            <span class="user-badge">Joachim Meinhardt</span>
+                            <span class="user-badge-red">Michael Empacher</span>
+                            <span class="user-badge">Matthias Ritzheim</span>
+                            <span class="user-badge-gray">Oliver Uwira</span>
+                            <span class="user-badge">Pedro Perez</span>
+                            <span class="user-badge-red">Richard Wroblewski</span>
+                            <span class="user-badge-red">Setareh Vishkaei</span>
+                            <span class="user-badge">Ulrich Stamm</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- BE.ACQ.DBO.AM_sn -->
+                <tr>
+                    <td class="asset-name">BE.ACQ.DBO.AM_sn</td>
+                    <td class="asset-desc">Application Manager Acquiring DBO</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">BE.ACQ.MNG_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">André Masy</span>
+                            <span class="user-badge">Andy Walker</span>
+                            <span class="user-badge">Blerim Shala</span>
+                            <span class="user-badge">Didier Trouveroy</span>
+                            <span class="user-badge">Eric Ponet</span>
+                            <span class="user-badge">Fatih Tanriverdi</span>
+                            <span class="user-badge">Patrick Lethé</span>
+                            <span class="user-badge">Pieter Ruts</span>
+                            <span class="user-badge">Shaun Jacobs</span>
+                            <span class="user-badge">Thierry Govaerts</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- GER.TSO.AOC.VAL_sn -->
+                <tr>
+                    <td class="asset-name">GER.TSO.AOC.VAL_sn</td>
+                    <td class="asset-desc">AOC TSO Validator</td>
+                    <td class="manager-name">Matthias Ritzheim</td>
+                    <td class="group-id">GER.FFM.TSO.VALIDATOR_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="empty-users">No specific team members listed</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.BE_XBOX.INS_sn -->
+                <tr>
+                    <td class="asset-name">FS.BE_XBOX.INS_sn</td>
+                    <td class="asset-desc">XBOX Installer</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">-</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge-red">Frederic Saelens</span>
+                            <span class="user-badge">Gilles Duvivier</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- GER.FFM.TSO.AOC_sn -->
+                <tr>
+                    <td class="asset-name">GER.FFM.TSO.AOC_sn</td>
+                    <td class="asset-desc">TSO für Aplication Output Control</td>
+                    <td class="manager-name">Matthias Ritzheim</td>
+                    <td class="group-id">GER.FFM.TSO.AOC_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge-red">Alexander Tschö</span>
+                            <span class="user-badge">Andreas Böhme</span>
+                            <span class="user-badge-red">Angelika Foerster</span>
+                            <span class="user-badge">Annette Lina Neutsch</span>
+                            <span class="user-badge">Birgit Hausdörfer</span>
+                            <span class="user-badge">Claudia Menzel</span>
+                            <span class="user-badge">Gilles Sodatonou</span>
+                            <span class="user-badge-red">Kay Hoese</span>
+                            <span class="user-badge-red">Peter Grimm</span>
+                            <span class="user-badge-red">Regina Steinle</span>
+                            <span class="user-badge">Sabine Mann</span>
+                            <span class="user-badge">Werner Lauter</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.CIBOP.IM_sn -->
+                <tr>
+                    <td class="asset-name">FS.CIBOP.IM_sn</td>
+                    <td class="asset-desc">Central Issuing Backoffice - Incident Manager</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">-</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Gaëtan Mertens</span>
+                            <span class="user-badge">Jalle Moors</span>
+                            <span class="user-badge">Jean-Pierre Bakker</span>
+                            <span class="user-badge">Kristof Rogge</span>
+                            <span class="user-badge">Philippe Mottin</span>
+                            <span class="user-badge">Pieter Ruts</span>
+                            <span class="user-badge">Wico van Heijzen</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- ops_pci_iss_bo_tm1_cams_sn -->
+                <tr>
+                    <td class="asset-name">ops_pci_iss_bo_tm1_cams_sn</td>
+                    <td class="asset-desc">CAMS ITALY OPS Team</td>
+                    <td class="manager-name">Daniele Manzotti</td>
+                    <td class="group-id">ops_pci_iss_bo_tm1_cams_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Daniele Manzotti</span>
+                            <span class="user-badge">Daniele Mosca</span>
+                            <span class="user-badge">Delia Gobbi</span>
+                            <span class="user-badge">Emanuele Battaglio</span>
+                            <span class="user-badge">Ezio Maria Frigerio</span>
+                            <span class="user-badge">Francesca Mariani</span>
+                            <span class="user-badge">Mattia Storti</span>
+                            <span class="user-badge">Petrisor Arinton</span>
+                            <span class="user-badge">Serena Rigamonti</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- FS.DE_IP-CORE.SYS_sn -->
+                <tr>
+                    <td class="asset-name">FS.DE_IP-CORE.SYS_sn</td>
+                    <td class="asset-desc">Sempris Core Support</td>
+                    <td class="manager-name">Matthias Ritzheim</td>
+                    <td class="group-id">FPL.DE_ISSUING_CORE.DEV_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="empty-users">No specific team members listed</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- BE.BO.INSTALLER_sn -->
+                <tr>
+                    <td class="asset-name">BE.BO.INSTALLER_sn</td>
+                    <td class="asset-desc">Belgium Installer Back Office for Prod environment</td>
+                    <td class="manager-name">Pieter Ruts</td>
+                    <td class="group-id">BE.CL.MNG_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">André Masy</span>
+                            <span class="user-badge-red">Michael Fry</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- ops_pci_iss_bo_tm1_cops_sn -->
+                <tr>
+                    <td class="asset-name">ops_pci_iss_bo_tm1_cops_sn</td>
+                    <td class="asset-desc">ops_pci_iss_bo_tm1_cops</td>
+                    <td class="manager-name">Daniele Manzotti</td>
+                    <td class="group-id">gsm_gov_information_systems_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Arinton Petrisor</span>
+                            <span class="user-badge">Danilo Papa</span>
+                            <span class="user-badge-red">Daniele Pastore</span>
+                            <span class="user-badge">Francesca Mariani</span>
+                            <span class="user-badge">Mattia Storti</span>
+                            <span class="user-badge-red">Riccardo Frigeni</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- ops_pci_iss_bo_tm1_ibo_sn -->
+                <tr>
+                    <td class="asset-name">ops_pci_iss_bo_tm1_ibo_sn</td>
+                    <td class="asset-desc">ops_pci_iss_bo_tm1_ibo</td>
+                    <td class="manager-name">Daniele Manzotti</td>
+                    <td class="group-id">cardproduction-ew@equensworldline.com</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Edwin Verzaal</span>
+                            <span class="user-badge-red">Gerard Lankheet</span>
+                            <span class="user-badge">Jaap van Mastrigt</span>
+                            <span class="user-badge">Michel Bouma</span>
+                            <span class="user-badge-red">Riccardo Frigeni</span>
+                            <span class="user-badge-red">Walter Dusschooten</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- ops_pci_iss_bo_tm1_sicu_sn -->
+                <tr>
+                    <td class="asset-name">ops_pci_iss_bo_tm1_sicu_sn</td>
+                    <td class="asset-desc">ops_pci_iss_bo_tm1_sicu</td>
+                    <td class="manager-name">Daniele Manzotti</td>
+                    <td class="group-id">gsm_gov_information_systems_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge">Daniele Manzotti</span>
+                            <span class="user-badge-red">Daniele Pastore</span>
+                            <span class="user-badge">Danilo Papa</span>
+                            <span class="user-badge">Francesca Mariani</span>
+                            <span class="user-badge">Mattia Storti</span>
+                            <span class="user-badge">Petrisor Arinton</span>
+                            <span class="user-badge-red">Riccardo Frigeni</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- ops_cartasi_interaction_cards_sn -->
+                <tr>
+                    <td class="asset-name">ops_cartasi_interaction_cards_sn</td>
+                    <td class="asset-desc">ops_cartasi_interaction_cards</td>
+                    <td class="manager-name">Daniele Manzotti</td>
+                    <td class="group-id">gsm_gov_information_systems_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge-red">Alessandra Soldati</span>
+                            <span class="user-badge-red">Angelo Maddaluno</span>
+                            <span class="user-badge-red">Antonio Menici</span>
+                            <span class="user-badge-red">Claudia Castellani</span>
+                            <span class="user-badge-red">Davide Corno</span>
+                            <span class="user-badge-red">Francesco Maria di Pinto</span>
+                            <span class="user-badge-red">Isabella Longo</span>
+                            <span class="user-badge-red">Rita Desideri</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- ops_pci_iss_bo_tm1_gec_sn -->
+                <tr>
+                    <td class="asset-name">ops_pci_iss_bo_tm1_gec_sn</td>
+                    <td class="asset-desc">ops_pci_iss_bo_tm1_gec</td>
+                    <td class="manager-name">Daniele Manzotti</td>
+                    <td class="group-id">gsm_gov_information_systems_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge-red">Antonio Menici</span>
+                            <span class="user-badge">Ciriaco Vitillo</span>
+                            <span class="user-badge">Danilo Papa</span>
+                            <span class="user-badge">Francesca Mariani</span>
+                            <span class="user-badge-red">Riccardo Frigeni</span>
+                            <span class="user-badge">Roberto Pacilli</span>
+                        </div>
+                    </td>
+                </tr>
+                
+                <!-- ops_pci_iss_bo_tm1_rs_sn -->
+                <tr>
+                    <td class="asset-name">ops_pci_iss_bo_tm1_rs_sn</td>
+                    <td class="asset-desc">ops_pci_iss_bo_tm1_rs</td>
+                    <td class="manager-name">Riccardo Frigeni</td>
+                    <td class="group-id">gsm_gov_information_systems_sn</td>
+                    <td>
+                        <div class="users-list">
+                            <span class="user-badge-red">Hubert van Helvoort</span>
+                            <span class="user-badge-red">Lesley Au</span>
+                            <span class="user-badge-red">Mustafa Caglayan</span>
+                            <span class="user-badge-red">Pieter Kevie</span>
+                            <span class="user-badge-red">Robert van der Velden</span>
+                            <span class="user-badge-red">Riccardo Frigeni</span>
+                            <span class="user-badge-red">Yvo Wernsen</span>
+                        </div>
+                    </td>
+                </tr>
+                
+            </tbody>
+        </table>
+        
+        <div class="footer">
+            <p><strong>CCMS - Clearing & Card Management Services</strong></p>
+            <p>Complete Asset Mapping Report | Generated January 29, 2026</p>
+        </div>
+    </div>
+</body>
+</html>

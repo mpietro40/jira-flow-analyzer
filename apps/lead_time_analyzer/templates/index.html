@@ -1,0 +1,1011 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jira Analytics Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .chart-container {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+        }
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-12">
+                <header class="bg-primary text-white py-2 px-4 mb-4">
+                    <div class="d-flex align-items-center">
+                        <img src="{{ url_for('lead_time_analyzer.static', filename='logo.png') }}" alt="Jira Lead Time Analyzer" style="height: 110px; margin-right: 20px;">
+                        <div>
+                            <h1><i class="fas fa-chart-line"></i> Jira Analytics Dashboard</h1>
+                            <p class="mb-0">Analyze your team's agile metrics and lead times</p>
+                        </div>
+                    </div>
+                </header>
+
+                <!-- Input Form -->
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h3><i class="fas fa-cog"></i> Configuration</h3>
+                    </div>
+                    <div class="card-body">
+                        <form type="POST" id="analysisForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="jira_url" class="form-label">Jira Server URL</label>
+                                        <input type="url" class="form-control" id="jira_url" name="jira_url" 
+                                               placeholder="https://your-company.atlassian.net" required>
+                                        <div class="form-text">Enter your Jira server URL</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="access_token" class="form-label">Access Token</label>
+                                        <input type="password" class="form-control" id="access_token" name="access_token" 
+                                               placeholder="Your API token" required>
+                                        <div class="form-text">API token for authentication</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="mb-3">
+                                        <label for="jql_query" class="form-label">JQL Query</label>
+                                        <input type="text" class="form-control" id="jql_query" name="jql_query" 
+                                               placeholder="project = PROJ AND status changed" required>
+                                        <div class="form-text">JQL query to filter issues</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="time_period" class="form-label">Analysis Period</label>
+                                        <select class="form-select" id="time_period" name="time_period">
+                                            <option value="1">Last 1 Month</option>
+                                            <option value="2">Last 2 Months</option>
+                                            <option value="3" selected>Last 3 Months</option>
+                                            <option value="6">Last 6 Months</option>
+                                            <option value="12">Last Year</option>
+                                            <option value="24">Last 2 Years</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-12">
+                                    <div class="mb-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" id="traverse_hierarchy" name="traverse_hierarchy">
+                                            <label class="form-check-label" for="traverse_hierarchy">
+                                                <strong>Traverse Hierarchy</strong>
+                                            </label>
+                                            <div class="form-text">Use JQL query to find initiatives, then analyze all child issues (Features, Epics, Stories, etc.). Large datasets will be processed with progress tracking.</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-play"></i> Analyze Data
+                            </button>
+                            <button type="button" id="resumeLastRun" class="btn btn-outline-secondary btn-lg ms-2">
+                                <i class="fas fa-history"></i> Resume Last Run
+                            </button>
+                        </form>
+                    </div>
+                </div>
+<!-- NEW SECTION -->
+                <!-- Loading Indicator -->
+                <div id="loading" class="loading">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary mb-3" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p id="loadingText" class="mt-2">Analyzing your Jira data...</p>
+                        
+                        <!-- Progress Bar for Hierarchical Analysis -->
+                        <div id="progressContainer" style="display: none;" class="mt-3">
+                            <div class="progress mb-2" style="height: 25px;">
+                                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" 
+                                     role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                                    <span id="progressText">0%</span>
+                                </div>
+                            </div>
+                            <small id="progressDetails" class="text-muted">Initializing...</small>
+                        </div>
+                    </div>
+                </div>
+<!-- CSV Upload Section -->
+<div class="card mb-4">
+    <div class="card-header">
+        <h3><i class="fas fa-upload"></i> Alternative: Upload CSV with Issue Keys</h3>
+    </div>
+    <div class="card-body">
+        <form type="POST" id="csvUploadForm" enctype="multipart/form-data">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="jira_url_csv" class="form-label">Jira Server URL</label>
+                        <input type="url" class="form-control" id="jira_url_csv" name="jira_url" 
+                               placeholder="https://your-company.atlassian.net" required>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="access_token_csv" class="form-label">Access Token</label>
+                        <input type="password" class="form-control" id="access_token_csv" name="access_token" 
+                               placeholder="Your API token" required>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                            <label for="time_period" class="form-label">Analysis Period</label>
+                            <select class="form-select" id="time_period" name="time_period">
+                                <option value="1">Last 1 Month</option>
+                                <option value="2">Last 2 Months</option>
+                                <option value="3" selected>Last 3 Months</option>
+                                <option value="6">Last 6 Months</option>
+                                <option value="12">Last Year</option>
+                            </select>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="mb-3">
+                        <label for="csv_file" class="form-label">CSV File with Issue Keys</label>
+                        <input type="file" class="form-control" id="csv_file" name="csv_file" 
+                               accept=".csv" required>
+                        <div class="form-text">CSV should have 'key' or 'issue' column (e.g., PROJ-123, MYPROJ-456)</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="mb-3">
+                        <label for="include_subtasks" class="form-label">Include Related Issues</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="include_subtasks" name="include_subtasks">
+                            <label class="form-check-label" for="include_subtasks">
+                                Include subtasks and linked issues
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-success btn-lg">
+                <i class="fas fa-upload"></i> Analyze from CSV
+            </button>
+        </form>
+    </div>
+</div>
+<!-- END  -->
+
+
+                <!-- Results Section -->
+                <div id="results" style="display: none;">
+                    <!-- Analysis Summary -->
+                    <div class="card mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h3><i class="fas fa-check-circle"></i> Analysis Summary</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div id="summaryProjects" class="mb-3"></div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div id="summaryPeople" class="mb-3"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Lead Time Metrics Explanation -->
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4><i class="fas fa-info-circle"></i> Lead Time Metrics Explained</h4>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-calculator"></i> Average Lead Time</h6>
+                                    <p class="small text-muted">The arithmetic mean of all lead times. Useful for capacity planning but can be skewed by outliers.</p>
+                                    
+                                    <h6><i class="fas fa-chart-bar"></i> Median Lead Time</h6>
+                                    <p class="small text-muted">The middle value when all lead times are sorted. More representative of typical performance than average.</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6><i class="fas fa-exclamation-triangle"></i> 85th Percentile</h6>
+                                    <p class="small text-muted">85% of items are completed within this time. Good for setting realistic delivery expectations.</p>
+                                    
+                                    <h6><i class="fas fa-warning"></i> 95th Percentile</h6>
+                                    <p class="small text-muted">95% of items are completed within this time. Helps identify outliers and worst-case scenarios.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Projects Analyzed >
+                    <div id="projectsSection" class="card mb-4" style="display: none;">
+                        <div class="card-header">
+                            <h4><i class="fas fa-project-diagram"></i> Projects Analyzed</h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="projectsList"></div>
+                        </div>
+                    </div -->
+
+                    <!-- People Involvement -->
+                    <div id="peopleSection" class="card mb-4" style="display: none;">
+                        <div class="card-header">
+                            <h4><i class="fas fa-users"></i> People Involvement</h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="peopleOverall" class="mb-4"></div>
+                            <div id="peopleByProject"></div>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Summary -->
+                    <div id="metricsSection" class="row mb-4">
+                        <!-- Metrics will be populated here -->
+                    </div>
+
+                    <!-- Charts Section -->
+                    <div id="chartsSection">
+                        <!-- Charts will be populated here -->
+                    </div>
+
+                    <!-- Comprehensive Report Section -->
+                    <div id="comprehensiveReportSection" class="card mb-4" style="display: none;">
+                        <div class="card-header bg-info text-white">
+                            <h4><i class="fas fa-chart-line"></i> Statistical Analysis & Recommendations</h4>
+                        </div>
+                        <div class="card-body">
+                            <div id="comprehensiveReportContent"></div>
+                        </div>
+                    </div>
+
+                    <!-- Download Report Button -->
+                    <div class="text-center mt-4">
+                        <button id="downloadReport" class="btn btn-success btn-lg">
+                            <i class="fas fa-download"></i> Download PDF Report
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Messages -->
+                <div id="messages"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE = "{{ url_for('lead_time_analyzer.index') }}".replace(/\/$/, '');
+        let analysisResults = null;
+        const STORAGE_KEY = 'jira_analysis_last_run';
+        let progressInterval = null;
+
+        function startProgressPolling(jqlQuery, timePeriod) {
+            progressInterval = setInterval(() => {
+                fetch(API_BASE + `/analysis_status?jql_query=${encodeURIComponent(jqlQuery)}&months_back=${timePeriod}`)
+                    .then(response => response.json())
+                    .then(status => {
+                        updateProgressBar(status);
+                    })
+                    .catch(error => {
+                        console.error('Progress polling error:', error);
+                    });
+            }, 2000); // Poll every 2 seconds
+        }
+
+        function stopProgressPolling() {
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+        }
+
+        function updateProgressBar(status) {
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const progressDetails = document.getElementById('progressDetails');
+            
+            if (status.status === 'in_progress') {
+                const percentage = Math.round(status.progress_percentage || 0);
+                progressBar.style.width = `${percentage}%`;
+                progressBar.setAttribute('aria-valuenow', percentage);
+                progressText.textContent = `${percentage}%`;
+                
+                const processed = status.processed_initiatives || 0;
+                const total = status.total_initiatives || 0;
+                const totalIssues = status.total_issues || 0;
+                
+                progressDetails.textContent = `Processing initiative ${processed}/${total} • ${totalIssues} issues found`;
+            } else if (status.status === 'completed') {
+                progressBar.style.width = '100%';
+                progressBar.setAttribute('aria-valuenow', 100);
+                progressText.textContent = '100%';
+                progressDetails.textContent = 'Analysis completed!';
+                stopProgressPolling();
+            }
+        }
+
+        // Check for saved results on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, checking for saved results');
+            checkForSavedResults();
+            
+            // Attach resume button handler
+            const resumeBtn = document.getElementById('resumeLastRun');
+            if (resumeBtn) {
+                console.log('Resume button found, attaching handler');
+                resumeBtn.addEventListener('click', function() {
+                    console.log('Resume button clicked');
+                    const savedData = localStorage.getItem(STORAGE_KEY);
+                    console.log('Raw localStorage data:', savedData ? 'exists' : 'not found');
+                    if (savedData) {
+                        const parsed = JSON.parse(savedData);
+                        console.log('Parsed data keys:', Object.keys(parsed));
+                        console.log('Has comprehensive_report:', !!parsed.comprehensive_report);
+                        console.log('Has metrics:', !!parsed.metrics);
+                        console.log('Has lead_times:', !!parsed.lead_times);
+                    }
+                    loadSavedResults();
+                });
+            } else {
+                console.error('Resume button not found!');
+            }
+        });
+
+        function checkForSavedResults() {
+            const savedResults = localStorage.getItem(STORAGE_KEY);
+            const resumeButton = document.getElementById('resumeLastRun');
+            
+            if (savedResults) {
+                resumeButton.style.display = 'inline-block';
+                resumeButton.classList.remove('btn-outline-secondary');
+                resumeButton.classList.add('btn-outline-success');
+                
+                try {
+                    const data = JSON.parse(savedResults);
+                    const savedDate = new Date(data.timestamp).toLocaleDateString();
+                    resumeButton.innerHTML = `<i class="fas fa-history"></i> Resume Last Run (${savedDate})`;
+                } catch (e) {
+                    resumeButton.innerHTML = '<i class="fas fa-history"></i> Resume Last Run';
+                }
+            } else {
+                resumeButton.style.display = 'none';
+            }
+        }
+
+        function saveResults(data) {
+            const saveData = {
+                ...data,
+                timestamp: new Date().toISOString()
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+            checkForSavedResults();
+        }
+
+        function loadSavedResults() {
+            const savedResults = localStorage.getItem(STORAGE_KEY);
+            if (savedResults) {
+                try {
+                    const data = JSON.parse(savedResults);
+                    console.log('Loaded data structure:', Object.keys(data));
+                    
+                    // Generate comprehensive report if missing
+                    if (!data.comprehensive_report && data.metrics) {
+                        console.log('Generating missing comprehensive report for saved results');
+                        const generatedReport = generateClientSideReport(data);
+                        console.log('Generated report:', generatedReport);
+                        if (generatedReport) {
+                            data.comprehensive_report = generatedReport;
+                            // Save updated data back to localStorage
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                            console.log('Updated localStorage with comprehensive report');
+                        } else {
+                            console.log('Failed to generate comprehensive report');
+                        }
+                    }
+                    
+                    analysisResults = data;
+                    displayResults(data);
+                    
+                    const savedDate = new Date(data.timestamp).toLocaleString();
+                    showMessage(`Loaded saved analysis from ${savedDate}`, 'success');
+                } catch (e) {
+                    console.error('Error loading saved results:', e);
+                    showMessage('Failed to load saved results', 'error');
+                }
+            } else {
+                showMessage('No saved results found', 'error');
+            }
+        }
+
+        function generateClientSideReport(data) {
+            if (!data.metrics || !data.metrics.lead_time) {
+                console.log('No metrics.lead_time data available for report generation');
+                return null;
+            }
+            
+            const lt = data.metrics.lead_time;
+            
+            // Try to get lead times from different possible locations
+            let leadTimes = data.lead_times || data.raw_lead_times || [];
+            
+            // If no raw lead times, create synthetic data from metrics for basic report
+            if (leadTimes.length === 0) {
+                console.log('No raw lead times found, generating basic report from metrics only');
+                return {
+                    executive_summary: `## Executive Summary: Lead Time Analysis\n\n**Key Metrics:**\n\n- **Median (typical):** ${lt.median.toFixed(1)} days\n- **Mean (average):** ${lt.average.toFixed(1)} days\n- **85th percentile:** ${lt.p85.toFixed(1)} days\n- **95th percentile:** ${lt.p95.toFixed(1)} days\n\n**Distribution:** ${lt.average > lt.median * 1.2 ? "Right-Skewed (Long Tail)" : "Approximately Normal"}`,
+                    recommendations: [{
+                        priority: 'MEDIUM',
+                        title: 'Monitor Lead Time Distribution',
+                        description: 'Based on available metrics, continue monitoring your lead time patterns.',
+                        action: 'Track individual lead times to enable more detailed analysis.',
+                        expected_impact: 'Better insights into process improvement opportunities'
+                    }]
+                };
+            }
+            
+            // Calculate outliers with available lead times
+            const sorted = [...leadTimes].sort((a, b) => a - b);
+            const q1 = sorted[Math.floor(sorted.length * 0.25)];
+            const q3 = sorted[Math.floor(sorted.length * 0.75)];
+            const iqr = q3 - q1;
+            const threshold = q3 + 1.5 * iqr;
+            const outliers = leadTimes.filter(t => t > threshold).sort((a, b) => b - a);
+            
+            const distributionType = lt.average > lt.median * 1.2 ? "Right-Skewed (Long Tail)" : "Approximately Normal";
+            
+            return {
+                executive_summary: `## Executive Summary: Lead Time Analysis\n\n**Dataset:** ${data.total_issues || leadTimes.length} issues analyzed\n**Key Finding:** Your lead time distribution is ${distributionType}\n\n### Critical Insights:\n\n1. **Typical vs Average Performance:**\n   - Median (typical): ${lt.median.toFixed(1)} days\n   - Mean (average): ${lt.average.toFixed(1)} days\n   - 50% of work completes in under ${lt.median.toFixed(1)} days\n\n2. **Process Predictability:**\n   - 85th percentile: ${lt.p85.toFixed(1)} days\n   - 95th percentile: ${lt.p95.toFixed(1)} days\n\n3. **Outlier Impact:**\n   - ${outliers.length} items are statistical outliers (>${threshold.toFixed(1)} days)\n   - Top outlier: ${outliers[0]?.toFixed(1) || 'N/A'} days`,
+                outlier_analysis: {
+                    top_5_outliers: outliers.slice(0, 5),
+                    outlier_impact: {
+                        potential_improvement: outliers.length > 0 ? (lt.average - leadTimes.filter(t => !outliers.includes(t)).reduce((a, b) => a + b, 0) / leadTimes.filter(t => !outliers.includes(t)).length) : 0
+                    }
+                },
+                recommendations: [
+                    {
+                        priority: 'HIGH',
+                        title: 'Focus on Eliminating Long-Tail Items',
+                        description: `You have ${outliers.length} outlier items. These items are inflating your average lead time.`,
+                        action: 'Investigate the longest items to identify common blockers or process issues.',
+                        expected_impact: 'Reduced average lead time and improved predictability'
+                    }
+                ]
+            };
+        }
+
+
+
+        document.getElementById('analysisForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const traverseHierarchy = document.getElementById('traverse_hierarchy').checked;
+            
+            // Show loading with appropriate message
+            const loadingDiv = document.getElementById('loading');
+            const loadingText = document.getElementById('loadingText');
+            const progressContainer = document.getElementById('progressContainer');
+            
+            if (traverseHierarchy) {
+                loadingText.textContent = 'Analyzing hierarchy... This may take several minutes for large datasets.';
+                progressContainer.style.display = 'none'; // Disable progress bar for now
+            } else {
+                loadingText.textContent = 'Analyzing your Jira data...';
+                progressContainer.style.display = 'none';
+            }
+            
+            loadingDiv.style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('messages').innerHTML = '';
+            
+            fetch(API_BASE + '/analyze', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    analysisResults = data;
+                    saveResults(data); // Save results locally
+                    displayResults(data);
+                    
+                    let successMessage = 'Analysis completed successfully!';
+                    if (data.analysis_type === 'hierarchical') {
+                        const metadata = data.hierarchy_metadata || {};
+                        successMessage += ` Analyzed ${metadata.total_initiatives || 0} initiatives with ${data.total_issues} total issues.`;
+                    }
+                    showMessage(successMessage, 'success');
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                document.getElementById('loading').style.display = 'none';
+                showMessage(`Network error: ${error.message}`, 'error');
+            });
+        });
+
+        function displayResults(data) {
+            console.log('Analysis data received:', data);
+            
+            // Ensure DOM is ready before manipulating elements
+            setTimeout(() => {
+                try {
+                    // Validate data structure
+                    if (!data || typeof data !== 'object') {
+                        throw new Error('Invalid data structure received');
+                    }
+                    
+                    // Display summary (projects and people)
+                    displaySummary(data);
+                    
+                    // Display projects if available
+                    if (data.projects && data.projects.length > 0) {
+                        displayProjects(data.projects);
+                    }
+                    
+                    // Display people involvement if available
+                    if (data.people_involvement) {
+                        displayPeopleInvolvement(data.people_involvement);
+                    }
+                    
+                    // Display metrics
+                    if (data.metrics) {
+                        displayMetrics(data.metrics);
+                    }
+                    
+                    // Display charts
+                    if (data.charts) {
+                        displayCharts(data.charts);
+                    }
+                    
+                    // Display comprehensive report if available
+                    console.log('Checking for comprehensive report:', !!data.comprehensive_report);
+                    if (data.comprehensive_report) {
+                        displayComprehensiveReport(data.comprehensive_report);
+                    } else {
+                        console.log('No comprehensive report found in data');
+                    }
+                    
+                    document.getElementById('results').style.display = 'block';
+                } catch (error) {
+                    console.error('Error in displayResults:', error);
+                    showMessage(`Display error: ${error.message}`, 'error');
+                }
+            }, 100);
+        }
+
+        function displaySummary(data) {
+            // Wait for DOM to be ready
+            const summaryProjects = document.getElementById('summaryProjects');
+            const summaryPeople = document.getElementById('summaryPeople');
+            
+            if (!summaryProjects || !summaryPeople) {
+                console.error('Summary elements not found, retrying...');
+                setTimeout(() => displaySummary(data), 200);
+                return;
+            }
+            
+            // Display projects
+            if (data.projects && Array.isArray(data.projects) && data.projects.length > 0) {
+                summaryProjects.innerHTML = `
+                    <h5><i class="fas fa-project-diagram"></i> Projects Analyzed (${data.projects.length})</h5>
+                    <p>${data.projects.map(p => `<span class="badge bg-primary me-1">${p}</span>`).join('')}</p>
+                `;
+            } else {
+                summaryProjects.innerHTML = '<h5><i class="fas fa-project-diagram"></i> No Projects Data</h5>';
+            }
+            
+            // Display people
+            if (data.people_involvement && data.people_involvement.overall) {
+                const overall = data.people_involvement.overall;
+                summaryPeople.innerHTML = `
+                    <h5><i class="fas fa-users"></i> People Involvement</h5>
+                    <p>
+                        <span class="badge bg-info me-2"><i class="fas fa-users"></i> ${overall.total_people || 0} Total</span>
+                        <span class="badge bg-secondary me-2"><i class="fas fa-user-edit"></i> ${overall.reporters || 0} Reporters</span>
+                        <span class="badge bg-secondary me-2"><i class="fas fa-user-check"></i> ${overall.assignees || 0} Assignees</span>
+                        <span class="badge bg-secondary"><i class="fas fa-comments"></i> ${overall.commenters || 0} Commenters</span>
+                    </p>
+                `;
+            } else {
+                summaryPeople.innerHTML = '<h5><i class="fas fa-users"></i> No People Data</h5>';
+            }
+        }
+
+        function displayProjects(projects) {
+            const projectsSection = document.getElementById('projectsSection');
+            const projectsList = document.getElementById('projectsList');
+            
+            if (projectsList) {
+                projectsList.innerHTML = '<p><strong>Jira Projects:</strong> ' + 
+                    projects.map(p => `<span class="badge bg-primary me-2">${p}</span>`).join('') + 
+                    '</p>';
+            }
+            
+            if (projectsSection) {
+                projectsSection.style.display = 'block';
+            }
+        }
+
+        function displayPeopleInvolvement(peopleData) {
+            console.log('displayPeopleInvolvement called with:', peopleData);
+            const peopleSection = document.getElementById('peopleSection');
+            const peopleOverall = document.getElementById('peopleOverall');
+            const peopleByProject = document.getElementById('peopleByProject');
+            
+            if (!peopleData || !peopleData.overall) {
+                console.error('Invalid people data structure:', peopleData);
+                return;
+            }
+            
+            // Display overall statistics
+            const overall = peopleData.overall;
+            console.log('Displaying overall people stats:', overall);
+            peopleOverall.innerHTML = `
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card text-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                            <div class="card-body">
+                                <h5><i class="fas fa-users"></i> Total People</h5>
+                                <h2>${overall.total_people || 0}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                            <div class="card-body">
+                                <h5><i class="fas fa-user-edit"></i> Reporters</h5>
+                                <h2>${overall.reporters || 0}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center" style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white;">
+                            <div class="card-body">
+                                <h5><i class="fas fa-user-check"></i> Assignees</h5>
+                                <h2>${overall.assignees || 0}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card text-center" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white;">
+                            <div class="card-body">
+                                <h5><i class="fas fa-comments"></i> Commenters</h5>
+                                <h2>${overall.commenters || 0}</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Display by project
+            if (peopleData.by_project && Object.keys(peopleData.by_project).length > 0) {
+                console.log('Displaying by-project data:', peopleData.by_project);
+                let projectsHtml = '<h5 class="mt-4 mb-3">By Project:</h5><div class="table-responsive"><table class="table table-striped"><thead><tr><th>Project</th><th>Total People</th><th>Reporters</th><th>Assignees</th><th>Commenters</th></tr></thead><tbody>';
+                
+                for (const [project, data] of Object.entries(peopleData.by_project)) {
+                    projectsHtml += `
+                        <tr>
+                            <td><strong>${project}</strong></td>
+                            <td><span class="badge bg-primary">${data.total_people || 0}</span></td>
+                            <td>${data.reporters || 0}</td>
+                            <td>${data.assignees || 0}</td>
+                            <td>${data.commenters || 0}</td>
+                        </tr>
+                    `;
+                }
+                
+                projectsHtml += '</tbody></table></div>';
+                peopleByProject.innerHTML = projectsHtml;
+            } else {
+                console.log('No by-project data to display');
+                peopleByProject.innerHTML = '<p>No project-specific data available.</p>';
+            }
+            
+            console.log('Making people section visible');
+            peopleSection.style.display = 'block';
+        }
+
+        function displayMetrics(metrics) {
+            const metricsSection = document.getElementById('metricsSection');
+            metricsSection.innerHTML = '';
+
+            if (metrics.lead_time) {
+                const lt = metrics.lead_time;
+                metricsSection.innerHTML += `
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h4><i class="fas fa-clock"></i> Average Lead Time</h4>
+                            <h2>${lt.average.toFixed(1)} days</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h4><i class="fas fa-chart-bar"></i> Median Lead Time</h4>
+                            <h2>${lt.median.toFixed(1)} days</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h4><i class="fas fa-exclamation-triangle"></i> 85th Percentile</h4>
+                            <h2>${lt.p85.toFixed(1)} days</h2>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="metric-card">
+                            <h4><i class="fas fa-warning"></i> 95th Percentile</h4>
+                            <h2>${lt.p95.toFixed(1)} days</h2>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function displayCharts(charts) {
+            const chartsSection = document.getElementById('chartsSection');
+            chartsSection.innerHTML = '';
+
+            const chartTitles = {
+                'lead_time_distribution': 'Lead Time Distribution',
+                'cycle_time_comparison': 'Cycle Time Comparison', 
+                'status_duration_boxplot': 'Status Duration Analysis',
+                'lead_time_trend': 'Lead Time Trend',
+                'metrics_summary': 'Metrics Summary'
+            };
+
+            for (const [chartKey, chartTitle] of Object.entries(chartTitles)) {
+                if (charts[chartKey]) {
+                    chartsSection.innerHTML += `
+                        <div class="chart-container">
+                            <h4>${chartTitle}</h4>
+                            <img src="${charts[chartKey]}" class="img-fluid" alt="${chartTitle}">
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        function displayComprehensiveReport(report) {
+            console.log('displayComprehensiveReport called with:', report);
+            const reportSection = document.getElementById('comprehensiveReportSection');
+            const reportContent = document.getElementById('comprehensiveReportContent');
+            
+            if (!report) {
+                console.log('No report data provided');
+                return;
+            }
+            
+            if (!reportContent) {
+                console.error('Report content element not found');
+                return;
+            }
+            
+            let html = '';
+            
+            // Executive Summary
+            if (report.executive_summary) {
+                html += `<div class="mb-4">${report.executive_summary.replace(/\n/g, '<br>')}</div>`;
+            }
+            
+            // Top 5 Outliers from outlier_analysis
+            if (report.outlier_analysis && report.outlier_analysis.top_5_outlier_details) {
+                const outlierDetails = report.outlier_analysis.top_5_outlier_details;
+                const impact = report.outlier_analysis.outlier_impact || {};
+                html += `
+                    <div class="alert alert-danger">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Top 5 Worst Performing Items</h5>
+                        <p>These specific items are taking significantly longer than typical and should be investigated immediately:</p>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead>
+                                    <tr><th>Rank</th><th>Issue Key</th><th>Lead Time</th><th>Summary</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${outlierDetails.map((item, i) => `
+                                        <tr>
+                                            <td><span class="badge bg-danger">#${i+1}</span></td>
+                                            <td><strong>${item.key}</strong></td>
+                                            <td><span class="badge bg-warning">${item.lead_time.toFixed(1)} days</span></td>
+                                            <td>${item.summary}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p><strong>Impact:</strong> Eliminating these ${outlierDetails.length} outliers could reduce your average lead time by ${impact.potential_improvement?.toFixed(1) || 'N/A'} days.</p>
+                    </div>
+                `;
+            } else if (report.outlier_analysis && report.outlier_analysis.top_5_outliers) {
+                // Fallback for old format
+                const outliers = report.outlier_analysis.top_5_outliers;
+                const impact = report.outlier_analysis.outlier_impact || {};
+                html += `
+                    <div class="alert alert-warning">
+                        <h5><i class="fas fa-exclamation-triangle"></i> Top 5 Outliers to Address</h5>
+                        <p>These items are taking significantly longer than typical:</p>
+                        <ul>
+                            ${outliers.map((days, i) => `<li><strong>Outlier #${i+1}:</strong> ${days.toFixed(1)} days</li>`).join('')}
+                        </ul>
+                        <p><strong>Impact:</strong> Eliminating these outliers could reduce your average lead time by ${impact.potential_improvement?.toFixed(1) || 'N/A'} days.</p>
+                    </div>
+                `;
+            }
+            
+            // Recommendations
+            if (report.recommendations && report.recommendations.length > 0) {
+                html += '<h5><i class="fas fa-lightbulb"></i> Actionable Recommendations</h5>';
+                report.recommendations.forEach((rec, i) => {
+                    const priorityClass = rec.priority === 'HIGH' ? 'danger' : rec.priority === 'MEDIUM' ? 'warning' : 'info';
+                    html += `
+                        <div class="alert alert-${priorityClass}">
+                            <h6><span class="badge bg-${priorityClass}">${rec.priority}</span> ${rec.title}</h6>
+                            <p>${rec.description}</p>
+                            <p><strong>Action:</strong> ${rec.action}</p>
+                            <p><strong>Expected Impact:</strong> ${rec.expected_impact}</p>
+                        </div>
+                    `;
+                });
+            }
+            
+            console.log('Setting report HTML:', html.length, 'characters');
+            reportContent.innerHTML = html;
+            reportSection.style.display = 'block';
+            console.log('Report section made visible');
+        }
+
+        function showMessage(message, type) {
+            const messagesDiv = document.getElementById('messages');
+            messagesDiv.innerHTML = `<div class="${type}">${message}</div>`;
+            
+            // Auto-hide success messages after 5 seconds
+            if (type === 'success') {
+                setTimeout(() => {
+                    messagesDiv.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        // Download PDF report
+        document.getElementById('downloadReport').addEventListener('click', function() {
+            if (!analysisResults) {
+                showMessage('No analysis results available', 'error');
+                return;
+            }
+
+            fetch(API_BASE + '/generate_report', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(analysisResults)
+            })
+            .then(response => {
+                if (response.ok) {
+                    return response.blob();
+                }
+                throw new Error('PDF generation failed');
+            })
+            .then(blob => {
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `jira_analysis_${new Date().toISOString().slice(0,10)}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+                showMessage('PDF report downloaded successfully!', 'success');
+            })
+            .catch(error => {
+                showMessage(`PDF generation error: ${error.message}`, 'error');
+            });
+        });
+
+
+
+// CSV Upload Form Handler
+document.addEventListener('DOMContentLoaded', function() {
+    const csvForm = document.getElementById('csvUploadForm');
+    if (csvForm) {
+        csvForm.addEventListener('submit', function(e) {
+            e.preventDefault(); // Prevent default form submission
+            
+            console.log('CSV form submitted'); // Debug log
+            
+            const formData = new FormData(this);
+            
+            // Validate file selection
+            const fileInput = document.getElementById('csv_file');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                showMessage('Please select a CSV file', 'error');
+                return;
+            }
+            
+            console.log('File selected:', fileInput.files[0].name); // Debug log
+            
+            // Show loading
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('messages').innerHTML = '';
+            
+            fetch(API_BASE + '/analyze_csv', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                console.log('Response status:', response.status); // Debug log
+                return response.json();
+            })
+            .then(data => {
+                console.log('Response data:', data); // Debug log
+                document.getElementById('loading').style.display = 'none';
+                
+                if (data.success) {
+                    analysisResults = data;
+                    saveResults(data); // Save results locally
+                    displayResults(data);
+                    showMessage(`Analysis completed! Processed ${data.total_issues} issues from CSV.`, 'success');
+                } else {
+                    showMessage(`Error: ${data.error}`, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Fetch error:', error); // Debug log
+                document.getElementById('loading').style.display = 'none';
+                showMessage(`Network error: ${error.message}`, 'error');
+            });
+        });
+    }
+});
+
+    </script>
+</body>
+</html>
